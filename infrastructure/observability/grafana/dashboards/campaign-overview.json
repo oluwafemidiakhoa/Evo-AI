@@ -1,0 +1,83 @@
+{
+  "dashboard": {
+    "title": "Evo-AI Campaign Overview",
+    "tags": ["evo-ai", "campaigns"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Campaigns",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "evo_ai_campaigns_active",
+            "legendFormat": "Active Campaigns"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Total Campaigns Created",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "evo_ai_campaigns_created_total",
+            "legendFormat": "Total Created"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Rounds Executed",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(evo_ai_rounds_executed_total[5m])",
+            "legendFormat": "Rounds/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 4,
+        "title": "Agent Execution Duration",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "evo_ai_agent_duration_seconds",
+            "legendFormat": "{{agent_type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      },
+      {
+        "id": 5,
+        "title": "Variants Generated",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(evo_ai_variants_generated_total[5m])",
+            "legendFormat": "{{mutation_type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+      },
+      {
+        "id": 6,
+        "title": "Evaluation Scores Distribution",
+        "type": "histogram",
+        "targets": [
+          {
+            "expr": "evo_ai_evaluation_score",
+            "legendFormat": "Score"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12}
+      }
+    ],
+    "schemaVersion": 36,
+    "version": 1
+  }
+}
