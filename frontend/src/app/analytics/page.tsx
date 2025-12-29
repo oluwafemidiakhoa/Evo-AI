@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button"
 import type { Campaign, Variant } from "@/types"
 
 export default function AnalyticsPage() {
-  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null)
+  const [_selectedCampaign, _setSelectedCampaign] = useState<string | null>(null)
 
   const { data: campaignsData, isLoading: campaignsLoading } = useSWR(
     ["campaigns", 1, 100],

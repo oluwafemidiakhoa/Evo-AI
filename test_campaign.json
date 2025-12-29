@@ -1,0 +1,1 @@
+{"name":"SUCCESS!","description":"Testing campaign creation","config":{"target_rounds":5,"variants_per_round":3,"selection_strategy":"top_k"}}

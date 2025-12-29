@@ -66,7 +66,7 @@ async def create_campaign(
     campaign = Campaign(
         name=campaign_data.name,
         description=campaign_data.description,
-        status=CampaignStatus.PENDING,
+        status=CampaignStatus.DRAFT,
         config=campaign_data.config,
     )
 
@@ -224,13 +224,13 @@ async def start_campaign(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    if campaign.status != CampaignStatus.PENDING:
+    if campaign.status != CampaignStatus.DRAFT:
         raise HTTPException(
             status_code=400,
-            detail=f"Campaign must be in PENDING status to start (current: {campaign.status.value})"
+            detail=f"Campaign must be in DRAFT status to start (current: {campaign.status.value})"
         )
 
-    campaign.status = CampaignStatus.IN_PROGRESS
+    campaign.status = CampaignStatus.ACTIVE
     updated = await repo.update(campaign)
 
     logger.info("campaign_started", campaign_id=str(campaign_id))
@@ -369,7 +369,7 @@ async def get_campaign_stats(
     variant_repo = PostgresVariantRepository(db)
 
     # Get all rounds
-    rounds = await round_repo.get_by_campaign_id(campaign_id)
+    rounds = await round_repo.get_by_campaign(campaign_id)
 
     # Count variants
     total_variants = 0

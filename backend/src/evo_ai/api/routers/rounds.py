@@ -47,7 +47,7 @@ async def list_rounds(
         List of rounds
     """
     repo = PostgresRoundRepository(db)
-    rounds = await repo.get_by_campaign_id(campaign_id)
+    rounds = await repo.get_by_campaign(campaign_id)
 
     return [RoundResponse.model_validate(r) for r in rounds]
 
@@ -70,7 +70,7 @@ async def get_round(
         Round details
     """
     repo = PostgresRoundRepository(db)
-    rounds = await repo.get_by_campaign_id(campaign_id)
+    rounds = await repo.get_by_campaign(campaign_id)
 
     round_obj = next((r for r in rounds if r.round_number == round_number), None)
 
@@ -166,7 +166,7 @@ async def get_round_stats(
     """
     # Get round
     round_repo = PostgresRoundRepository(db)
-    rounds = await round_repo.get_by_campaign_id(campaign_id)
+    rounds = await round_repo.get_by_campaign(campaign_id)
     round_obj = next((r for r in rounds if r.round_number == round_number), None)
 
     if not round_obj:

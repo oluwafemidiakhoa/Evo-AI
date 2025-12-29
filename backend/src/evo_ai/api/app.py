@@ -121,7 +121,8 @@ def create_app() -> FastAPI:
     )
 
     # Setup tracing (must be after CORS but before routes)
-    setup_tracing(app)
+    # Temporarily disabled - OTLP collector not running
+    # setup_tracing(app)
 
     # Exception handlers
     @app.exception_handler(Exception)

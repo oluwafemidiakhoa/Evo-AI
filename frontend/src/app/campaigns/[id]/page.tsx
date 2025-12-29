@@ -1,10 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { use } from "react"
 import Link from "next/link"
 import useSWR from "swr"
-import { ArrowLeft, Play, Pause, BarChart3, GitBranch, FileText } from "lucide-react"
+import { ArrowLeft, Play, BarChart3, GitBranch, FileText } from "lucide-react"
 
 import { campaignsAPI, roundsAPI, tasksAPI, reportsAPI } from "@/lib/api/client"
 import { Button } from "@/components/ui/button"
@@ -15,9 +14,9 @@ import { formatDate, formatScore, getStatusColor } from "@/lib/utils"
 export default function CampaignDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
-  const { id } = use(params)
+  const { id } = params
   const [executingRound, setExecutingRound] = useState<number | null>(null)
 
   const { data: campaign, error: campaignError, mutate: mutateCampaign } = useSWR(

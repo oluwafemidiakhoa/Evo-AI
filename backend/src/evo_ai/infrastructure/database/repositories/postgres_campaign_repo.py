@@ -1,10 +1,11 @@
 """PostgreSQL implementation of Campaign repository."""
 
+import json
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import insert, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from evo_ai.domain.models.campaign import Campaign, CampaignStatus
@@ -26,19 +27,26 @@ class PostgresCampaignRepository(CampaignRepository):
 
     async def create(self, entity: Campaign) -> Campaign:
         """Create a new campaign."""
-        db_campaign = CampaignDB(
-            id=entity.id,
-            name=entity.name,
-            description=entity.description,
-            status=CampaignStatusEnum(entity.status.value),
-            config=entity.config,
-            metadata=entity.metadata,
-            created_at=entity.created_at,
-            updated_at=entity.updated_at,
-        )
-        self.session.add(db_campaign)
+        # Use raw SQL to completely bypass SQLModel/Pydantic v2 default_factory issues
+        stmt = text("""
+            INSERT INTO campaigns (id, name, description, status, config, meta_data, created_at, updated_at)
+            VALUES (:id, :name, :description, :status, :config, :meta_data, :created_at, :updated_at)
+        """)
+
+        await self.session.execute(stmt, {
+            "id": str(entity.id),
+            "name": entity.name,
+            "description": entity.description,
+            "status": entity.status.name.upper(),  # Use enum name instead of value
+            "config": json.dumps(entity.config),
+            "meta_data": json.dumps(entity.metadata),
+            "created_at": entity.created_at,
+            "updated_at": entity.updated_at,
+        })
         await self.session.flush()
-        return self._to_domain(db_campaign)
+
+        # Fetch the created campaign using ORM select (not instantiation)
+        return await self.get_by_id(entity.id)
 
     async def get_by_id(self, entity_id: UUID) -> Optional[Campaign]:
         """Retrieve campaign by ID."""
@@ -84,7 +92,7 @@ class PostgresCampaignRepository(CampaignRepository):
         db_campaign.description = entity.description
         db_campaign.status = CampaignStatusEnum(entity.status.value)
         db_campaign.config = entity.config
-        db_campaign.metadata = entity.metadata
+        db_campaign.meta_data = entity.metadata
         db_campaign.updated_at = datetime.utcnow()
 
         await self.session.flush()
@@ -165,7 +173,7 @@ class PostgresCampaignRepository(CampaignRepository):
             description=db_campaign.description,
             status=CampaignStatus(db_campaign.status.value),
             config=db_campaign.config,
-            metadata=db_campaign.metadata,
+            metadata=db_campaign.meta_data,
             created_at=db_campaign.created_at,
             updated_at=db_campaign.updated_at,
             deleted_at=db_campaign.deleted_at,

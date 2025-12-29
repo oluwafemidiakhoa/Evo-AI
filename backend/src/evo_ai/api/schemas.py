@@ -32,8 +32,8 @@ class CampaignResponse(BaseModel):
     status: str
     config: Dict[str, Any]
     created_at: datetime
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

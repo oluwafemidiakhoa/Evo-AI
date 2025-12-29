@@ -8,7 +8,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from evo_ai.domain.models.report import Report
-from evo_ai.infrastructure.database.models import ReportDB
+from evo_ai.infrastructure.database.models import ReportDB, RoundDB
 
 
 class PostgresReportRepository:
@@ -48,6 +48,17 @@ class PostgresReportRepository:
         result = await self.session.execute(
             select(ReportDB)
             .where(ReportDB.round_id == round_id)
+            .order_by(desc(ReportDB.created_at))
+        )
+        db_reports = result.scalars().all()
+        return [self._to_domain(db_r) for db_r in db_reports]
+
+    async def get_by_campaign_id(self, campaign_id: UUID) -> List[Report]:
+        """Retrieve all reports for a campaign."""
+        result = await self.session.execute(
+            select(ReportDB)
+            .join(RoundDB, ReportDB.round_id == RoundDB.id)
+            .where(RoundDB.campaign_id == campaign_id)
             .order_by(desc(ReportDB.created_at))
         )
         db_reports = result.scalars().all()

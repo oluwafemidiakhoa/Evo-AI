@@ -13,12 +13,14 @@ from evo_ai.config import settings
 # Convert postgresql:// to postgresql+asyncpg://
 database_url = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
 
+# For local development: disable SSL for PostgreSQL connections
 engine = create_async_engine(
     database_url,
     echo=settings.debug,
     pool_size=settings.database_pool_size,
     max_overflow=settings.database_max_overflow,
     pool_pre_ping=True,  # Verify connections before using
+    connect_args={"ssl": False},  # Disable SSL for local development
 )
 
 # Create session factory
