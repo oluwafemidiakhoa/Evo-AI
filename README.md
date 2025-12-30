@@ -4,6 +4,14 @@
 
 Evo-AI is a production-ready platform that uses LLM agents and evolutionary algorithms to automatically improve code. Think of it as "genetic algorithms meets GPT" for software optimization.
 
+## 🌐 Live Demo
+
+**Backend API**: https://evo-ai-nakk.onrender.com
+
+- 📚 **API Docs**: https://evo-ai-nakk.onrender.com/api/docs
+- 💚 **Health Check**: https://evo-ai-nakk.onrender.com/health
+- 📖 **API Reference**: https://evo-ai-nakk.onrender.com/api/redoc
+
 ## What Does Evo-AI Actually Do?
 
 Instead of manually optimizing code, Evo-AI:
