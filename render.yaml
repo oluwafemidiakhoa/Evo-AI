@@ -1,0 +1,29 @@
+services:
+  # Backend API Service
+  - type: web
+    name: evo-ai-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: PYTHONUNBUFFERED
+        value: 1
+      # These must be added manually in Render dashboard (secrets):
+      # - DATABASE_URL (from PostgreSQL service)
+      # - REDIS_URL (from Upstash or Redis Cloud)
+      # - ANTHROPIC_API_KEY
+      # - OPENAI_API_KEY
+      # - CORS_ORIGINS
+    healthCheckPath: /health
+    autoDeploy: true
+
+databases:
+  # PostgreSQL Database
+  - name: evo-ai-db
+    databaseName: evo_ai
+    user: evoai
+    plan: free
