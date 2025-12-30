@@ -29,4 +29,5 @@ COPY alembic.ini ./
 EXPOSE 8000
 
 # Start server
-CMD ["uvicorn", "evo_ai.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Use shell form to allow environment variable substitution
+CMD uvicorn evo_ai.api.app:app --host 0.0.0.0 --port ${PORT:-8000}
