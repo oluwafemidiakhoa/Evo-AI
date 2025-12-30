@@ -19,10 +19,10 @@ const nextConfig = {
   // Enable standalone output for Docker
   output: 'standalone',
 
-  // Experimental features
-  experimental: {
-    typedRoutes: true,
-  },
+  // Experimental features (disabled for lower memory usage)
+  // experimental: {
+  //   typedRoutes: true,
+  // },
 
   // Image optimization
   images: {
