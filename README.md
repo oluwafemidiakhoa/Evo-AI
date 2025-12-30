@@ -6,11 +6,15 @@ Evo-AI is a production-ready platform that uses LLM agents and evolutionary algo
 
 ## 🌐 Live Demo
 
-**Backend API**: https://evo-ai-nakk.onrender.com
+**🎨 Frontend**: https://evo-ai-seven.vercel.app
+
+**⚙️ Backend API**: https://evo-ai-nakk.onrender.com
 
 - 📚 **API Docs**: https://evo-ai-nakk.onrender.com/api/docs
 - 💚 **Health Check**: https://evo-ai-nakk.onrender.com/health
 - 📖 **API Reference**: https://evo-ai-nakk.onrender.com/api/redoc
+
+**Try it yourself!** Create campaigns, execute evolution rounds, and watch AI agents optimize code in real-time.
 
 ## What Does Evo-AI Actually Do?
 
