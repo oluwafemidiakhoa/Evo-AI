@@ -29,16 +29,16 @@ const nextConfig = {
     domains: [],
   },
 
-  // Redirects
-  async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/campaigns',
-        permanent: false,
-      },
-    ]
-  },
+  // Redirects (temporarily disabled for debugging)
+  // async redirects() {
+  //   return [
+  //     {
+  //       source: '/',
+  //       destination: '/campaigns',
+  //       permanent: false,
+  //     },
+  //   ]
+  // },
 }
 
 module.exports = nextConfig
