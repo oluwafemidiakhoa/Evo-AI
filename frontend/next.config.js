@@ -29,16 +29,7 @@ const nextConfig = {
     domains: [],
   },
 
-  // Redirects - root to campaigns page
-  async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/campaigns',
-        permanent: false,
-      },
-    ]
-  },
+  // No redirects needed - root page serves as dashboard/landing page
 }
 
 module.exports = nextConfig
