@@ -24,10 +24,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
+COPY start.sh ./
+
+# Make start script executable
+RUN chmod +x start.sh
 
 # Expose port
 EXPOSE 8000
 
-# Start server
-# Use shell form to allow environment variable substitution
-CMD uvicorn evo_ai.api.app:app --host 0.0.0.0 --port ${PORT:-8000}
+# Run migrations and start server
+CMD ["./start.sh"]
