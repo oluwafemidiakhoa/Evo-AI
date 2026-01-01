@@ -58,8 +58,8 @@ services:
       # App Config
       ENVIRONMENT: development
       LOG_LEVEL: INFO
-      CORS_ORIGINS: '["http://localhost:3000","http://frontend:3000"]'
-      SECRET_KEY: dev-secret-key-change-in-production
+      CORS_ORIGINS: http://localhost:3000,http://frontend:3000
+      SECRET_KEY: dev-secret-key-change-in-production-must-be-at-least-32-chars
 
       # S3/MinIO (optional but required by settings)
       S3_ACCESS_KEY: minioadmin
