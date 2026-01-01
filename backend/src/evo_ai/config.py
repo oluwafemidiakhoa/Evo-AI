@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     environment: str = Field(default="development")
     debug: bool = Field(default=False)
     secret_key: str = Field(min_length=32)
-    cors_origins: List[str] = Field(default=["http://localhost:3000"])
+    # Accept str or List[str] to handle both env var formats
+    cors_origins: str | List[str] = Field(default="http://localhost:3000")
 
     # Database
     database_url: str = Field(
@@ -76,11 +77,19 @@ class Settings(BaseSettings):
 
     @field_validator("cors_origins", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: str | List[str]) -> List[str]:
+    def parse_cors_origins(cls, v: str | List[str] | None) -> List[str]:
         """Parse CORS origins from comma-separated string or list."""
+        # Handle None or empty string - use default
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return ["http://localhost:3000"]
+
+        # Parse comma-separated string
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+            return origins if origins else ["http://localhost:3000"]
+
+        # Already a list
+        return v if v else ["http://localhost:3000"]
 
 
 # Global settings instance
