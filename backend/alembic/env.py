@@ -74,11 +74,12 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     """Run migrations in async mode."""
-    # Get database URL from environment
+    # Get database URL from environment and clean it for asyncpg
     from evo_ai.config import settings
+    from evo_ai.infrastructure.database.connection import prepare_database_url
 
-    # Convert to async driver
-    database_url = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
+    # Clean URL and get connect_args (removes sslmode, channel_binding, etc.)
+    database_url, connect_args = prepare_database_url(settings.database_url)
 
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = database_url
@@ -87,6 +88,7 @@ async def run_async_migrations() -> None:
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args,  # Pass SSL configuration
     )
 
     async with connectable.connect() as connection:
