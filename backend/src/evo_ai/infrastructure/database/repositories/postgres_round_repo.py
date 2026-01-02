@@ -132,6 +132,10 @@ class PostgresRoundRepository(RoundRepository):
         db_rounds = result.scalars().all()
         return [self._to_domain(db_r) for db_r in db_rounds]
 
+    async def get_by_campaign_id(self, campaign_id: UUID) -> List[Round]:
+        """Backwards-compatible alias for get_by_campaign."""
+        return await self.get_by_campaign(campaign_id)
+
     async def get_latest_round(self, campaign_id: UUID) -> Optional[Round]:
         """Get the most recent round for a campaign."""
         result = await self.session.execute(

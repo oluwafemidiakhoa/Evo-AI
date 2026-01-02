@@ -136,6 +136,10 @@ class PostgresPolicyRepository(PolicyRepository):
         db_policies = result.scalars().all()
         return [self._to_domain(db_p) for db_p in db_policies]
 
+    async def get_by_campaign_id(self, campaign_id: UUID) -> List[Policy]:
+        """Backwards-compatible alias for get_by_campaign."""
+        return await self.get_by_campaign(campaign_id, active_only=False)
+
     async def get_active_policy(
         self,
         campaign_id: UUID,
