@@ -37,7 +37,7 @@ class PostgresCampaignRepository(CampaignRepository):
             "id": str(entity.id),
             "name": entity.name,
             "description": entity.description,
-            "status": entity.status.name.upper(),  # Use enum name instead of value
+            "status": entity.status.value,  # Match PostgreSQL enum values (lowercase)
             "config": json.dumps(entity.config),
             "meta_data": json.dumps(entity.metadata),
             "created_at": entity.created_at,
