@@ -224,18 +224,22 @@ async def start_campaign(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    if campaign.status != CampaignStatus.DRAFT:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Campaign must be in DRAFT status to start (current: {campaign.status.value})"
-        )
+    if campaign.status == CampaignStatus.DRAFT:
+        campaign.status = CampaignStatus.ACTIVE
+        updated = await repo.update(campaign)
 
-    campaign.status = CampaignStatus.ACTIVE
-    updated = await repo.update(campaign)
+        logger.info("campaign_started", campaign_id=str(campaign_id))
 
-    logger.info("campaign_started", campaign_id=str(campaign_id))
+        return CampaignResponse.model_validate(updated)
 
-    return CampaignResponse.model_validate(updated)
+    if campaign.status == CampaignStatus.ACTIVE:
+        logger.info("campaign_already_active", campaign_id=str(campaign_id))
+        return CampaignResponse.model_validate(campaign)
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Campaign must be in DRAFT status to start (current: {campaign.status.value})"
+    )
 
 
 @router.post("/{campaign_id}/execute")
