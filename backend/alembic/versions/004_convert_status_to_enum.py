@@ -16,14 +16,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Convert campaigns.status to use campaignstatusenum
-    op.execute("ALTER TABLE campaigns ALTER COLUMN status TYPE campaignstatusenum USING status::text::campaignstatusenum")
+    # Update existing data to lowercase before converting to ENUM
+    # Campaigns
+    op.execute("UPDATE campaigns SET status = LOWER(status)")
+    op.execute("ALTER TABLE campaigns ALTER COLUMN status TYPE campaignstatusenum USING status::campaignstatusenum")
 
-    # Convert rounds.status to use roundstatusenum
-    op.execute("ALTER TABLE rounds ALTER COLUMN status TYPE roundstatusenum USING status::text::roundstatusenum")
+    # Rounds
+    op.execute("UPDATE rounds SET status = LOWER(status)")
+    op.execute("ALTER TABLE rounds ALTER COLUMN status TYPE roundstatusenum USING status::roundstatusenum")
 
-    # Convert policies.policy_type to use policytypeenum
-    op.execute("ALTER TABLE policies ALTER COLUMN policy_type TYPE policytypeenum USING policy_type::text::policytypeenum")
+    # Policies
+    op.execute("UPDATE policies SET policy_type = LOWER(policy_type)")
+    op.execute("ALTER TABLE policies ALTER COLUMN policy_type TYPE policytypeenum USING policy_type::policytypeenum")
 
 
 def downgrade() -> None:
