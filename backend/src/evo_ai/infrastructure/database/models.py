@@ -19,7 +19,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import Column, Enum as SAEnum, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSON, TIMESTAMP, UUID as PG_UUID
 from sqlmodel import Field, SQLModel
 
@@ -66,7 +66,17 @@ class CampaignDB(SQLModel, table=True):
     )
     name: str = Field(max_length=255, index=True)
     description: Optional[str] = None
-    status: CampaignStatusEnum = Field(default=CampaignStatusEnum.DRAFT)
+    status: CampaignStatusEnum = Field(
+        default=CampaignStatusEnum.DRAFT,
+        sa_column=Column(
+            SAEnum(
+                CampaignStatusEnum,
+                name="campaignstatusenum",
+                values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            ),
+            nullable=False,
+        ),
+    )
     config: dict = Field(sa_column=Column(JSON, nullable=False))
     meta_data: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(
@@ -101,7 +111,17 @@ class RoundDB(SQLModel, table=True):
         sa_column=Column(PG_UUID(as_uuid=True), ForeignKey("campaigns.id"), nullable=False, index=True)
     )
     round_number: int = Field(ge=1)
-    status: RoundStatusEnum = Field(default=RoundStatusEnum.PENDING)
+    status: RoundStatusEnum = Field(
+        default=RoundStatusEnum.PENDING,
+        sa_column=Column(
+            SAEnum(
+                RoundStatusEnum,
+                name="roundstatusenum",
+                values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            ),
+            nullable=False,
+        ),
+    )
     plan: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
     metrics: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     started_at: Optional[datetime] = Field(
@@ -242,7 +262,16 @@ class PolicyDB(SQLModel, table=True):
         sa_column=Column(PG_UUID(as_uuid=True), ForeignKey("campaigns.id"), nullable=False, index=True)
     )
     name: str = Field(max_length=255)
-    policy_type: PolicyTypeEnum = Field()
+    policy_type: PolicyTypeEnum = Field(
+        sa_column=Column(
+            SAEnum(
+                PolicyTypeEnum,
+                name="policytypeenum",
+                values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            ),
+            nullable=False,
+        ),
+    )
     version: int = Field(default=1, ge=1)
     config: dict = Field(sa_column=Column(JSON, nullable=False))
     is_active: bool = Field(default=True)
