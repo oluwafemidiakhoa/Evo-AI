@@ -69,15 +69,17 @@ Click **"Environment"** tab and add these variables:
 |-----|-------|-------|
 | `DATABASE_URL` | (Paste from Step 1) | PostgreSQL Internal URL |
 | `REDIS_URL` | (Paste from Step 2) | Redis connection URL |
-| `ANTHROPIC_API_KEY` | `sk-ant-api03-wocmqHfjv_E_OSYy1JwovQoPA-jSsXiwAA` | Your Anthropic key |
-| `OPENAI_API_KEY` | `sk-proj-qFTyuztGSzfHyl5yimukQ87T1DXzA4eZQA` | Your OpenAI key |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | Your Anthropic key |
+| `OPENAI_API_KEY` | `sk-proj-...` | Your OpenAI key |
 | `ENVIRONMENT` | `production` | |
 | `LOG_LEVEL` | `INFO` | |
 | `CORS_ORIGINS` | `https://evo-ai.vercel.app` | Your Vercel URL |
-| `S3_ACCESS_KEY` | `minioadmin` | Default for dev |
-| `S3_SECRET_KEY` | `minioadmin` | Default for dev |
-| `S3_ENDPOINT` | `http://localhost:9000` | MinIO endpoint |
-| `S3_BUCKET` | `evo-ai-reports` | Bucket name |
+| `SECRET_KEY` | `your-32+-char-secret` | Required for JWT/security |
+| `S3_ACCESS_KEY` | `your-s3-access-key` | Optional (only if using S3 storage) |
+| `S3_SECRET_KEY` | `your-s3-secret-key` | Optional (only if using S3 storage) |
+| `S3_ENDPOINT` | `https://s3.us-east-1.amazonaws.com` | Optional (S3-compatible endpoint) |
+| `S3_BUCKET` | `evo-ai-reports` | Optional |
+| `S3_REGION` | `us-east-1` | Optional |
 
 **Note**: Replace the Vercel URL with your actual frontend URL once deployed.
 

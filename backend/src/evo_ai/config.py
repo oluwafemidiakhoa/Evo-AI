@@ -1,5 +1,6 @@
 """Application configuration using Pydantic settings."""
 
+import secrets
 from typing import List
 
 from pydantic import Field, field_validator
@@ -23,7 +24,10 @@ class Settings(BaseSettings):
     # Application
     environment: str = Field(default="development")
     debug: bool = Field(default=False)
-    secret_key: str = Field(min_length=32)
+    secret_key: str = Field(
+        default_factory=lambda: secrets.token_urlsafe(48),
+        min_length=32
+    )
     # Accept str or List[str] to handle both env var formats
     cors_origins: str | List[str] = Field(default="http://localhost:3000")
 
@@ -44,13 +48,13 @@ class Settings(BaseSettings):
 
     # S3 Storage
     s3_endpoint: str = Field(default="http://localhost:9000")
-    s3_access_key: str
-    s3_secret_key: str
+    s3_access_key: str = Field(default="")
+    s3_secret_key: str = Field(default="")
     s3_bucket: str = Field(default="evo-ai-reports")
     s3_region: str = Field(default="us-east-1")
 
     # OpenAI
-    openai_api_key: str
+    openai_api_key: str = Field(default="")
     openai_default_model: str = Field(default="gpt-4o")
     openai_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     openai_max_tokens: int = Field(default=4000, ge=100, le=128000)

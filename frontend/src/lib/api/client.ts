@@ -4,7 +4,10 @@
  * Provides type-safe methods for all backend endpoints.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8002'
+const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+const API_BASE_URL =
+  RAW_API_BASE_URL?.replace(/\/$/, '') ||
+  (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8002')
 
 export class APIError extends Error {
   constructor(
