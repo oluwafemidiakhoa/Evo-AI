@@ -146,6 +146,10 @@ class PostgresVariantRepository(VariantRepository):
         db_variants = result.scalars().all()
         return [self._to_domain(db_v) for db_v in db_variants]
 
+    async def get_selected_by_round(self, round_id: UUID) -> List[Variant]:
+        """Backwards-compatible alias for get_selected_variants."""
+        return await self.get_selected_variants(round_id)
+
     async def get_by_parent(self, parent_id: UUID) -> List[Variant]:
         """Retrieve all child variants of a parent."""
         result = await self.session.execute(
