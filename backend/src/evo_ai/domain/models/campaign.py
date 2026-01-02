@@ -37,6 +37,8 @@ class Campaign(BaseModel):
         default_factory=dict,
         description="Extensible metadata for custom fields"
     )
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = None

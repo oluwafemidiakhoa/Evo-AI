@@ -216,7 +216,7 @@ async def start_campaign(
         db: Database session
 
     Returns:
-        Updated campaign with IN_PROGRESS status
+        Updated campaign with ACTIVE status
     """
     repo = PostgresCampaignRepository(db)
     campaign = await repo.get_by_id(campaign_id)

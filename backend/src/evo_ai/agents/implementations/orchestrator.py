@@ -128,11 +128,11 @@ class AgentOrchestrator:
             # Update context with round_id
             context.round_id = round_id
 
-            # Update round status to IN_PROGRESS
+            # Update round status to GENERATING (planning already completed)
             async with get_session() as session:
                 round_repo = PostgresRoundRepository(session)
                 round_obj = await round_repo.get_by_id(round_id)
-                round_obj.status = RoundStatus.IN_PROGRESS
+                round_obj.status = RoundStatus.GENERATING
                 await round_repo.update(round_obj)
 
             # Step 2: Get parent variants
@@ -280,8 +280,8 @@ class AgentOrchestrator:
             if not campaign:
                 raise ValueError(f"Campaign {campaign_id} not found")
 
-            # Update status to IN_PROGRESS
-            campaign.status = CampaignStatus.IN_PROGRESS
+            # Update status to ACTIVE while executing rounds
+            campaign.status = CampaignStatus.ACTIVE
             await campaign_repo.update(campaign)
 
             # Get max_rounds from config if not provided
