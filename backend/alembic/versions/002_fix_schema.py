@@ -24,7 +24,7 @@ def upgrade() -> None:
     op.drop_index('idx_rounds_campaign', table_name='rounds')
     op.create_index('idx_rounds_campaign_status', 'rounds', ['campaign_id', 'status', 'deleted_at'], unique=False)
     op.create_index('idx_rounds_status', 'rounds', ['status'], unique=False)
-    op.create_constraint('uq_campaign_round_number', 'rounds', ['campaign_id', 'round_number'], type_='unique')
+    op.create_unique_constraint('uq_campaign_round_number', 'rounds', ['campaign_id', 'round_number'])
 
     # Fix variants table
     op.add_column('variants', sa.Column('mutation_type', sa.String(length=50), nullable=True))
@@ -55,7 +55,7 @@ def upgrade() -> None:
     op.drop_index('idx_policies_type', table_name='policies')
     op.create_index('idx_policies_campaign_active', 'policies', ['campaign_id', 'is_active', 'deleted_at'], unique=False)
     op.create_index('idx_policies_type', 'policies', ['policy_type'], unique=False)
-    op.create_constraint('uq_campaign_policy_type_version', 'policies', ['campaign_id', 'policy_type', 'version'], type_='unique')
+    op.create_unique_constraint('uq_campaign_policy_type_version', 'policies', ['campaign_id', 'policy_type', 'version'])
 
     # Fix agent_decisions table - complete rebuild
     op.drop_index('idx_agent_decisions_trace', table_name='agent_decisions')
