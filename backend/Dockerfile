@@ -33,4 +33,4 @@ RUN chmod +x start.sh
 EXPOSE 8000
 
 # Run migrations and start server
-CMD ["./start.sh"]
+CMD ["/bin/bash", "./start.sh"]
