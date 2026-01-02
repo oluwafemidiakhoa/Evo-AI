@@ -240,10 +240,6 @@ class EvaluationDB(SQLModel, table=True):
         default_factory=datetime.utcnow,
         sa_column=Column(TIMESTAMP(timezone=True), nullable=False)
     )
-    updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(TIMESTAMP(timezone=True), nullable=False)
-    )
 
     __table_args__ = (
         Index("idx_evaluations_variant", "variant_id"),

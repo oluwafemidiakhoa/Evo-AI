@@ -3,6 +3,7 @@
 Allows agents to run evaluations on variants and retrieve results.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -66,10 +67,16 @@ class EvaluationTool:
         """
         async with get_session() as session:
             repo = PostgresEvaluationRepository(session)
+            variant_repo = PostgresVariantRepository(session)
+
+            variant = await variant_repo.get_by_id(variant_id)
+            if not variant:
+                raise ValueError(f"Variant {variant_id} not found")
 
             # Create evaluation in pending state
             evaluation = Evaluation(
                 variant_id=variant_id,
+                round_id=variant.round_id,
                 evaluator_type=evaluator_type,
                 evaluation_config=evaluation_config,
                 status=EvaluationStatus.PENDING,
@@ -125,6 +132,7 @@ class EvaluationTool:
             evaluation.score = score
             evaluation.result_data = result_data
             evaluation.status = status
+            evaluation.completed_at = datetime.utcnow() if status == EvaluationStatus.COMPLETED else None
 
             updated = await repo.update(evaluation)
 
@@ -179,8 +187,8 @@ class EvaluationTool:
                     "status": e.status.value,
                     "result_data": e.result_data,
                     "created_at": e.created_at.isoformat(),
-                    "completed_at": e.completed_at.isoformat() if e.completed_at else None,
-                }
+                "completed_at": e.completed_at.isoformat() if e.completed_at else None,
+            }
                 for e in evaluations
             ]
 
