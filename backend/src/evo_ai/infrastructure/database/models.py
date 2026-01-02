@@ -123,6 +123,7 @@ class RoundDB(SQLModel, table=True):
         ),
     )
     plan: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
+    meta_data: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     metrics: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     started_at: Optional[datetime] = Field(
         default=None,
@@ -180,6 +181,7 @@ class VariantDB(SQLModel, table=True):
         default_factory=dict,
         sa_column=Column(JSON, nullable=False)
     )
+    meta_data: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     is_selected: bool = Field(default=False)
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -233,6 +235,7 @@ class EvaluationDB(SQLModel, table=True):
         default_factory=dict,
         sa_column=Column(JSON, nullable=False)
     )
+    meta_data: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(TIMESTAMP(timezone=True), nullable=False)
@@ -275,6 +278,7 @@ class PolicyDB(SQLModel, table=True):
     version: int = Field(default=1, ge=1)
     config: dict = Field(sa_column=Column(JSON, nullable=False))
     is_active: bool = Field(default=True)
+    meta_data: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(TIMESTAMP(timezone=True), nullable=False)
