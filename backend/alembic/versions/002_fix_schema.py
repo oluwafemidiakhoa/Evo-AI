@@ -21,16 +21,27 @@ def upgrade() -> None:
     op.add_column('rounds', sa.Column('metrics', postgresql.JSON(astext_type=sa.Text()), nullable=False, server_default='{}'))
     op.add_column('rounds', sa.Column('started_at', sa.TIMESTAMP(timezone=True), nullable=True))
     op.add_column('rounds', sa.Column('completed_at', sa.TIMESTAMP(timezone=True), nullable=True))
-    op.drop_index('idx_rounds_campaign', table_name='rounds')
+
+    # Drop old index if exists
+    try:
+        op.drop_index('idx_rounds_campaign', table_name='rounds')
+    except Exception:
+        pass
+
     op.create_index('idx_rounds_campaign_status', 'rounds', ['campaign_id', 'status', 'deleted_at'], unique=False)
     op.create_index('idx_rounds_status', 'rounds', ['status'], unique=False)
     op.create_unique_constraint('uq_campaign_round_number', 'rounds', ['campaign_id', 'round_number'])
 
     # Fix variants table
     op.add_column('variants', sa.Column('mutation_type', sa.String(length=50), nullable=True))
-    op.drop_index('idx_variants_round', table_name='variants')
-    op.drop_index('idx_variants_hash', table_name='variants')
-    op.drop_index('idx_variants_lineage', table_name='variants')
+
+    # Drop old indexes if they exist
+    for idx_name in ['idx_variants_round', 'idx_variants_hash', 'idx_variants_lineage']:
+        try:
+            op.drop_index(idx_name, table_name='variants')
+        except Exception:
+            pass
+
     op.create_index('idx_variants_round', 'variants', ['round_id', 'deleted_at'], unique=False)
     op.create_index('idx_variants_parent', 'variants', ['parent_id', 'deleted_at'], unique=False)
     op.create_index('idx_variants_lineage', 'variants', ['generation', 'is_selected'], unique=False)
@@ -38,28 +49,44 @@ def upgrade() -> None:
     op.create_index('idx_variants_selected', 'variants', ['round_id', 'is_selected'], unique=False)
 
     # Fix evaluations table - drop old columns and add new ones
-    op.drop_column('evaluations', 'evaluator_type')
-    op.drop_column('evaluations', 'feedback')
+    # Drop old columns if they exist
+    for col_name in ['evaluator_type', 'feedback', 'deleted_at', 'updated_at']:
+        try:
+            op.drop_column('evaluations', col_name)
+        except Exception:
+            pass
+
     op.add_column('evaluations', sa.Column('round_id', postgresql.UUID(as_uuid=True), nullable=False))
     op.add_column('evaluations', sa.Column('evaluator_config', postgresql.JSON(astext_type=sa.Text()), nullable=False, server_default='{}'))
     op.add_column('evaluations', sa.Column('execution_metadata', postgresql.JSON(astext_type=sa.Text()), nullable=False, server_default='{}'))
     op.create_foreign_key('fk_evaluations_round_id', 'evaluations', 'rounds', ['round_id'], ['id'])
-    op.drop_column('evaluations', 'deleted_at')
-    op.drop_column('evaluations', 'updated_at')
     op.create_index('idx_evaluations_round', 'evaluations', ['round_id'], unique=False)
     op.create_index('idx_evaluations_score', 'evaluations', ['round_id', 'score'], unique=False)
 
     # Fix policies table
     op.add_column('policies', sa.Column('campaign_id', postgresql.UUID(as_uuid=True), nullable=False))
     op.create_foreign_key('fk_policies_campaign_id', 'policies', 'campaigns', ['campaign_id'], ['id'])
-    op.drop_index('idx_policies_type', table_name='policies')
+
+    # Drop old index if exists
+    try:
+        op.drop_index('idx_policies_type', table_name='policies')
+    except Exception:
+        pass
+
     op.create_index('idx_policies_campaign_active', 'policies', ['campaign_id', 'is_active', 'deleted_at'], unique=False)
     op.create_index('idx_policies_type', 'policies', ['policy_type'], unique=False)
     op.create_unique_constraint('uq_campaign_policy_type_version', 'policies', ['campaign_id', 'policy_type', 'version'])
 
     # Fix agent_decisions table - complete rebuild
-    op.drop_index('idx_agent_decisions_trace', table_name='agent_decisions')
-    op.drop_table('agent_decisions')
+    try:
+        op.drop_index('idx_agent_decisions_trace', table_name='agent_decisions')
+    except Exception:
+        pass
+
+    try:
+        op.drop_table('agent_decisions')
+    except Exception:
+        pass
     op.create_table('agent_decisions',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('trace_id', postgresql.UUID(as_uuid=True), nullable=False),
@@ -87,9 +114,16 @@ def upgrade() -> None:
     op.create_index('idx_agent_decisions_campaign', 'agent_decisions', ['campaign_id', 'created_at'], unique=False)
 
     # Fix mcp_access_logs table - complete rebuild
-    op.drop_index('idx_mcp_logs_tool', table_name='mcp_access_logs')
-    op.drop_index('idx_mcp_logs_trace', table_name='mcp_access_logs')
-    op.drop_table('mcp_access_logs')
+    for idx_name in ['idx_mcp_logs_tool', 'idx_mcp_logs_trace']:
+        try:
+            op.drop_index(idx_name, table_name='mcp_access_logs')
+        except Exception:
+            pass
+
+    try:
+        op.drop_table('mcp_access_logs')
+    except Exception:
+        pass
     op.create_table('mcp_access_logs',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('trace_id', postgresql.UUID(as_uuid=True), nullable=False),
@@ -110,12 +144,32 @@ def upgrade() -> None:
 
     # Fix reports table
     op.add_column('reports', sa.Column('format', sa.String(length=20), nullable=False, server_default='markdown'))
-    op.drop_constraint('reports_campaign_id_fkey', 'reports', type_='foreignkey')
-    op.drop_column('reports', 'campaign_id')
-    op.drop_column('reports', 'deleted_at')
+
+    # Try to drop constraint and columns if they exist (from old schema)
+    try:
+        op.drop_constraint('reports_campaign_id_fkey', 'reports', type_='foreignkey')
+    except Exception:
+        pass  # Constraint doesn't exist, continue
+
+    # Drop indexes that might exist from old schema
+    try:
+        op.drop_index('idx_reports_campaign', table_name='reports')
+    except Exception:
+        pass  # Index doesn't exist, continue
+
+    # Drop columns that might exist from old schema
+    try:
+        op.drop_column('reports', 'campaign_id')
+    except Exception:
+        pass  # Column doesn't exist, continue
+
+    try:
+        op.drop_column('reports', 'deleted_at')
+    except Exception:
+        pass  # Column doesn't exist, continue
+
     op.alter_column('reports', 'content', nullable=True)
     op.alter_column('reports', 'round_id', nullable=False)
-    op.drop_index('idx_reports_campaign', table_name='reports')
     op.create_index('idx_reports_round', 'reports', ['round_id', 'report_type'], unique=False)
     op.create_index('idx_reports_created', 'reports', ['created_at'], unique=False)
 
