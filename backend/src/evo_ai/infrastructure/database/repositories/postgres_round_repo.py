@@ -27,6 +27,7 @@ class PostgresRoundRepository(RoundRepository):
             round_number=entity.round_number,
             status=RoundStatusEnum(entity.status.value),
             plan=entity.plan,
+            meta_data={},
             metrics=entity.metrics,
             started_at=entity.started_at,
             completed_at=entity.completed_at,

@@ -104,7 +104,7 @@ class DomainQueryTool:
                 "campaign_id": str(round_obj.campaign_id),
                 "round_number": round_obj.round_number,
                 "status": round_obj.status.value,
-                "config": round_obj.config,
+                "plan": round_obj.plan,
                 "started_at": round_obj.started_at.isoformat() if round_obj.started_at else None,
                 "completed_at": round_obj.completed_at.isoformat() if round_obj.completed_at else None,
             }
@@ -179,10 +179,10 @@ class DomainQueryTool:
             return {
                 "id": str(policy.id),
                 "campaign_id": str(policy.campaign_id),
-                "round_number": policy.round_number,
-                "policy_type": policy.policy_type,
-                "rules": policy.rules,
-                "parameters": policy.parameters,
+                "round_number": policy.config.get("round_number"),
+                "policy_type": policy.config.get("strategy", policy.policy_type.value),
+                "rules": policy.config.get("rules", {}),
+                "parameters": policy.config.get("parameters", {}),
                 "is_active": policy.is_active,
                 "created_at": policy.created_at.isoformat(),
             }
@@ -289,15 +289,18 @@ class DomainQueryTool:
 
             # Filter by round number if specified
             if round_number is not None:
-                policies = [p for p in policies if p.round_number == round_number]
+                policies = [
+                    p for p in policies
+                    if p.config.get("round_number") == round_number
+                ]
 
             return [
                 {
                     "id": str(p.id),
-                    "policy_type": p.policy_type,
-                    "round_number": p.round_number,
-                    "rules": p.rules,
-                    "parameters": p.parameters,
+                    "policy_type": p.config.get("strategy", p.policy_type.value),
+                    "round_number": p.config.get("round_number"),
+                    "rules": p.config.get("rules", {}),
+                    "parameters": p.config.get("parameters", {}),
                 }
                 for p in policies
             ]

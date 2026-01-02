@@ -14,7 +14,7 @@ import structlog
 
 from evo_ai.agents.base import BaseEvoAgent, AgentContext, AgentDecision
 from evo_ai.agents.tools import DomainQueryTool, EvaluationTool
-from evo_ai.domain.models.policy import Policy
+from evo_ai.domain.models.policy import Policy, PolicyType
 from evo_ai.infrastructure.database.connection import get_session
 from evo_ai.infrastructure.database.repositories.postgres_policy_repo import (
     PostgresPolicyRepository
@@ -190,10 +190,15 @@ Output: Selection policy with clear rules and parameters.
         # Create policy entity
         policy = Policy(
             campaign_id=context.campaign_id,
-            round_number=round_number,
-            policy_type=policy_type,
-            rules=rules,
-            parameters=params,
+            name=f"{policy_type} selection policy (round {round_number})",
+            policy_type=PolicyType.SELECTION,
+            config={
+                "strategy": policy_type,
+                "round_number": round_number,
+                "rules": rules,
+                "parameters": params,
+                "selection_pressure": selection_pressure,
+            },
             is_active=True,
         )
 

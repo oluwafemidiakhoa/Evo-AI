@@ -30,6 +30,7 @@ class PostgresVariantRepository(VariantRepository):
             content_hash=entity.content_hash,
             mutation_type=entity.mutation_type,
             mutation_metadata=entity.mutation_metadata,
+            meta_data={},
             is_selected=entity.is_selected,
             created_at=entity.created_at,
             updated_at=entity.updated_at,

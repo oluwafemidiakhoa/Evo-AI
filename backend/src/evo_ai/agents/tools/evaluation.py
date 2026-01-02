@@ -187,8 +187,8 @@ class EvaluationTool:
                     "status": e.status.value,
                     "result_data": e.result_data,
                     "created_at": e.created_at.isoformat(),
-                "completed_at": e.completed_at.isoformat() if e.completed_at else None,
-            }
+                    "completed_at": e.completed_at.isoformat() if e.completed_at else None,
+                }
                 for e in evaluations
             ]
 

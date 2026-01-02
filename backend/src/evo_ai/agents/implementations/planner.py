@@ -289,13 +289,7 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
             campaign_id=context.campaign_id,
             round_number=round_number,
             status=RoundStatus.PENDING,
-            config={
-                "variant_count": plan["variant_count"],
-                "mutation_types": plan["mutation_types"],
-                "mutation_distribution": plan["mutation_distribution"],
-                "evaluation_strategy": plan["evaluation_strategy"],
-                "selection_pressure": plan["selection_pressure"],
-            }
+            plan=plan,
         )
 
         async with get_session() as session:

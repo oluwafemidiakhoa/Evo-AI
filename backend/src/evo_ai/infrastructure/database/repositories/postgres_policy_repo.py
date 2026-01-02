@@ -29,6 +29,7 @@ class PostgresPolicyRepository(PolicyRepository):
             version=entity.version,
             config=entity.config,
             is_active=entity.is_active,
+            meta_data={},
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )
