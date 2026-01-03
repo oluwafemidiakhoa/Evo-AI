@@ -395,3 +395,59 @@ async def get_campaign_stats(
         max_generation=max_generation,
         selection_rate=total_selected / total_variants if total_variants > 0 else 0.0
     )
+
+
+@router.get("/{campaign_id}/lineage")
+async def get_campaign_lineage(
+    campaign_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all variants for campaign with parent-child relationships for lineage visualization.
+
+    Args:
+        campaign_id: Campaign UUID
+        db: Database session
+
+    Returns:
+        List of variants with parent_id, generation, is_selected, mutation_type
+    """
+    repo = PostgresCampaignRepository(db)
+    campaign = await repo.get_by_id(campaign_id)
+
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    # Get all rounds for campaign
+    round_repo = PostgresRoundRepository(db)
+    rounds = await round_repo.get_by_campaign(campaign_id)
+
+    # Get all variants across all rounds
+    variant_repo = PostgresVariantRepository(db)
+    all_variants = []
+
+    for round_obj in rounds:
+        variants = await variant_repo.get_by_round_id(round_obj.id)
+        all_variants.extend(variants)
+
+    # Format for lineage graph
+    lineage_data = [
+        {
+            "id": str(v.id),
+            "parent_id": str(v.parent_id) if v.parent_id else None,
+            "generation": v.generation,
+            "mutation_type": v.mutation_type,
+            "is_selected": v.is_selected,
+            "round_id": str(v.round_id),
+            "content_hash": v.content_hash,
+            "created_at": v.created_at.isoformat()
+        }
+        for v in all_variants
+    ]
+
+    return {
+        "campaign_id": str(campaign_id),
+        "total_variants": len(lineage_data),
+        "max_generation": max((v.generation for v in all_variants), default=0),
+        "variants": lineage_data
+    }

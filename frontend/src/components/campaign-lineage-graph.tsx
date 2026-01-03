@@ -5,6 +5,7 @@ import * as d3 from "d3"
 
 interface GraphNode {
   id: string
+  parent_id: string | null
   generation: number
   mutation_type: string | null
   is_selected: boolean
@@ -69,22 +70,13 @@ export function CampaignLineageGraph({ variants, onNodeClick }: CampaignLineageG
       })
     })
 
-    // Create links data (parent-child relationships)
-    const links: GraphLink[] = []
-    // Note: This requires parent_id in the data, which we'll add from the API
-    // For now, we'll create links based on generation progression
-    variants.forEach(variant => {
-      const sameRoundPrevGen = variants.find(v =>
-        v.generation === variant.generation - 1 &&
-        v.round_id === variant.round_id
-      )
-      if (sameRoundPrevGen) {
-        links.push({
-          source: sameRoundPrevGen.id,
-          target: variant.id
-        })
-      }
-    })
+    // Create links data using parent_id relationships
+    const links: GraphLink[] = variants
+      .filter(v => v.parent_id !== null)
+      .map(v => ({
+        source: v.parent_id as string,
+        target: v.id
+      }))
 
     // Draw links
     g.selectAll(".link")
@@ -106,14 +98,13 @@ export function CampaignLineageGraph({ variants, onNodeClick }: CampaignLineageG
       .attr("class", "node")
       .attr("transform", d => `translate(${positions.get(d.id)?.x},${positions.get(d.id)?.y})`)
       .style("cursor", "pointer")
-      .on("mouseenter", (event, d) => {
+      .on("mouseenter", (_event, d) => {
         setHoveredNode(d.id)
       })
       .on("mouseleave", () => {
         setHoveredNode(null)
       })
-      .on("click", (event, d) => {
-        event.stopPropagation()
+      .on("click", (_event, d) => {
         if (onNodeClick) {
           onNodeClick(d.id)
         }

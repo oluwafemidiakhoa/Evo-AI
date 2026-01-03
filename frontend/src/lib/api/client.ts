@@ -102,6 +102,10 @@ export const campaignsAPI = {
   async getStats(id: string) {
     return fetchAPI<any>(`/api/campaigns/${id}/stats`)
   },
+
+  async getLineage(id: string) {
+    return fetchAPI<any>(`/api/campaigns/${id}/lineage`)
+  },
 }
 
 // Rounds API
