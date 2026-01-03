@@ -142,7 +142,7 @@ Output: Evaluation results with scores, feedback, and confidence.
         variant = await self._call_tool("get_variant", variant_context)
         lineage = await self._call_tool("get_lineage", variant_context)
 
-        # Create evaluation record
+        # Create evaluation record (may return cached result)
         eval_result = await self._call_tool(
             "create_evaluation",
             variant_context,
@@ -151,6 +151,18 @@ Output: Evaluation results with scores, feedback, and confidence.
             evaluation_config=evaluation_config
         )
         evaluation_id = UUID(eval_result["evaluation_id"])
+
+        if eval_result.get("cached"):
+            cached_data = eval_result.get("result_data", {})
+            return {
+                "evaluation_id": str(evaluation_id),
+                "variant_id": str(variant_id),
+                "score": eval_result.get("score"),
+                "feedback": cached_data.get("feedback", "Cached evaluation result."),
+                "criteria_scores": cached_data.get("criteria_scores", {}),
+                "confidence": 0.95,
+                "cached": True,
+            }
 
         # Execute evaluation based on type
         if evaluator_type == "llm_judge":
@@ -163,6 +175,10 @@ Output: Evaluation results with scores, feedback, and confidence.
             )
         elif evaluator_type == "benchmark":
             score, feedback, criteria = await self._evaluate_with_benchmark(
+                variant, lineage, evaluation_config
+            )
+        elif evaluator_type == "ensemble":
+            score, feedback, criteria = await self._evaluate_with_ensemble(
                 variant, lineage, evaluation_config
             )
         else:
@@ -329,6 +345,69 @@ Output: Evaluation results with scores, feedback, and confidence.
 
         return score, feedback, criteria
 
+    async def _evaluate_with_ensemble(
+        self,
+        variant: Dict[str, Any],
+        lineage: Dict[str, Any],
+        config: Dict[str, Any]
+    ) -> tuple[float, str, Dict[str, Any]]:
+        """Evaluate using an ensemble of evaluators."""
+        config = config or {}
+        ensemble = config.get("ensemble", [])
+
+        if not ensemble:
+            score, feedback, criteria = await self._evaluate_with_llm(
+                variant, lineage, config
+            )
+            return score, feedback, {"ensemble": [{"type": "llm_judge", "score": score, "criteria": criteria}]}
+
+        component_results = []
+        weighted_scores = []
+        total_weight = 0.0
+
+        for component in ensemble:
+            evaluator = component.get("type", "llm_judge")
+            weight = float(component.get("weight", 1.0))
+            component_config = component.get("config", {})
+
+            if evaluator == "llm_judge":
+                score, feedback, criteria = await self._evaluate_with_llm(
+                    variant, lineage, component_config
+                )
+            elif evaluator == "unit_test":
+                score, feedback, criteria = await self._evaluate_with_tests(
+                    variant, lineage, component_config
+                )
+            elif evaluator == "benchmark":
+                score, feedback, criteria = await self._evaluate_with_benchmark(
+                    variant, lineage, component_config
+                )
+            else:
+                raise ValueError(f"Unknown evaluator type: {evaluator}")
+
+            component_results.append({
+                "type": evaluator,
+                "weight": weight,
+                "score": score,
+                "criteria_scores": criteria,
+                "feedback": feedback,
+            })
+
+            weighted_scores.append(score * weight)
+            total_weight += weight
+
+        aggregate_score = sum(weighted_scores) / total_weight if total_weight else 0.0
+        feedback = (
+            "Ensemble evaluation:\n"
+            + "\n".join(
+                f"- {c['type']}: {c['score']:.2f} (w={c['weight']:.2f})"
+                for c in component_results
+            )
+            + f"\nAggregate score: {aggregate_score:.2f}"
+        )
+
+        return aggregate_score, feedback, {"ensemble": component_results}
+
     async def evaluate_batch(
         self,
         context: AgentContext,
@@ -348,6 +427,15 @@ Output: Evaluation results with scores, feedback, and confidence.
         Returns:
             Batch results with rankings
         """
+        evaluation_config = evaluation_config or {}
+        strategy_evaluators = evaluation_config.get("evaluators") or []
+        strategy_ensemble = evaluation_config.get("ensemble")
+
+        if strategy_ensemble:
+            evaluator_type = "ensemble"
+        elif strategy_evaluators:
+            evaluator_type = strategy_evaluators[0]
+
         results = []
 
         for variant_id in variant_ids:

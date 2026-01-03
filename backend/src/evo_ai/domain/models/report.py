@@ -4,7 +4,7 @@ Report domain model - represents generated analysis reports.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -31,10 +31,11 @@ class Report(BaseModel):
     """
 
     id: UUID = Field(default_factory=uuid4)
+    campaign_id: Optional[UUID] = None
     round_id: UUID
     report_type: str = Field(..., description="Type: 'round_summary', 'lineage_analysis', etc.")
     format: str = Field(..., description="Format: 'markdown', 'json', 'html'")
-    content: Optional[str] = Field(None, description="Small reports stored inline")
+    content: Optional[Any] = Field(None, description="Small reports stored inline")
     storage_path: Optional[str] = Field(None, description="S3 path for large reports")
     meta_data: dict = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.utcnow)

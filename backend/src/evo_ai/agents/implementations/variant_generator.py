@@ -7,6 +7,7 @@ Responsibilities:
 - Use MCP servers to access and modify code
 """
 
+import random
 from typing import Any, Callable, Dict, List
 from uuid import UUID
 
@@ -338,6 +339,8 @@ Output: New variant with content, mutation metadata, and lineage info.
         mutation_types = mutation_plan.get("mutation_types", ["refactor"])
         distribution = mutation_plan.get("mutation_distribution", {})
         total_count = mutation_plan.get("variant_count", len(parent_ids))
+        seed = mutation_plan.get("seed")
+        rng = random.Random(seed) if seed is not None else None
 
         variants = []
 
@@ -345,8 +348,8 @@ Output: New variant with content, mutation metadata, and lineage info.
         for i, parent_id in enumerate(parent_ids[:total_count]):
             # Select mutation type based on distribution
             if distribution:
-                import random
-                mutation_type = random.choices(
+                chooser = rng or random
+                mutation_type = chooser.choices(
                     list(distribution.keys()),
                     weights=list(distribution.values())
                 )[0]

@@ -7,6 +7,8 @@ Responsibilities:
 - Plan evaluation strategies
 """
 
+import hashlib
+import json
 from typing import Any, Callable, Dict, List
 from uuid import UUID
 
@@ -217,12 +219,23 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
                 f"on best solutions."
             )
 
-        # Evaluation strategy
+        # Evaluation strategy (supports ensemble evaluators)
+        evaluators = config.get("evaluators", ["llm_judge"])
+        ensemble = config.get("ensemble")
+        if ensemble is None and len(evaluators) > 1:
+            weight = 1.0 / len(evaluators)
+            ensemble = [{"type": evaluator, "weight": weight} for evaluator in evaluators]
+
         evaluation_strategy = {
-            "evaluators": config.get("evaluators", ["llm_judge"]),
+            "evaluators": evaluators,
+            "primary_evaluator": evaluators[0] if evaluators else "llm_judge",
+            "ensemble": ensemble,
+            "criteria_weights": config.get("criteria_weights"),
             "parallel_execution": True,
             "timeout_seconds": 300,
         }
+
+        seed = config.get("seed", context.campaign_id.int % (2 ** 32))
 
         # Build round plan
         round_plan = {
@@ -232,6 +245,7 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
             "mutation_distribution": mutation_distribution,
             "evaluation_strategy": evaluation_strategy,
             "selection_pressure": selection_pressure,
+            "seed": seed,
             "phase": phase,
             "reasoning": reasoning,
             "historical_context": {
@@ -241,6 +255,10 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
                 "recent_scores": historical_scores,
             }
         }
+        plan_hash = hashlib.sha256(
+            json.dumps(round_plan, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        round_plan["plan_hash"] = plan_hash
 
         # Log planning decision
         decision = AgentDecision(

@@ -50,7 +50,7 @@ async def list_reports(
     if round_id:
         reports = [r for r in reports if r.round_id == round_id]
     if report_type:
-        reports = [r for r in reports if r.report_type.value == report_type]
+        reports = [r for r in reports if r.report_type == report_type]
 
     # Pagination
     total = len(reports)

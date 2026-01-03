@@ -7,6 +7,7 @@ Responsibilities:
 - Balance diversity vs convergence
 """
 
+from collections import Counter
 from typing import Any, Callable, Dict, List
 from uuid import UUID
 
@@ -187,6 +188,8 @@ Output: Selection policy with clear rules and parameters.
         else:
             raise ValueError(f"Unknown policy type: {policy_type}")
 
+        objective_weights = self._build_objective_weights(selection_pressure)
+
         # Create policy entity
         policy = Policy(
             campaign_id=context.campaign_id,
@@ -198,6 +201,8 @@ Output: Selection policy with clear rules and parameters.
                 "rules": rules,
                 "parameters": params,
                 "selection_pressure": selection_pressure,
+                "selection_count": select_count,
+                "objective_weights": objective_weights,
             },
             is_active=True,
         )
@@ -273,6 +278,143 @@ Output: Selection policy with clear rules and parameters.
         }
         return rules, params
 
+    def _build_objective_weights(self, selection_pressure: float) -> Dict[str, float]:
+        """Build multi-objective weights based on selection pressure."""
+        if selection_pressure < 0.4:
+            weights = {
+                "evaluation_score": 0.5,
+                "novelty": 0.25,
+                "diversity": 0.2,
+                "innovation": 0.05,
+            }
+        elif selection_pressure < 0.7:
+            weights = {
+                "evaluation_score": 0.65,
+                "novelty": 0.15,
+                "diversity": 0.15,
+                "innovation": 0.05,
+            }
+        else:
+            weights = {
+                "evaluation_score": 0.8,
+                "novelty": 0.1,
+                "diversity": 0.07,
+                "innovation": 0.03,
+            }
+
+        total = sum(weights.values()) or 1.0
+        return {key: value / total for key, value in weights.items()}
+
+    def _rank_variants(
+        self,
+        variants: List[Dict[str, Any]],
+        evaluations: Dict[str, Any],
+        policy_config: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Rank variants using multi-objective scoring."""
+        evals = evaluations.get("evaluations", [])
+        scores_by_variant: Dict[str, List[float]] = {}
+        innovation_by_variant: Dict[str, List[float]] = {}
+
+        for evaluation in evals:
+            if evaluation.get("status") != "completed":
+                continue
+            variant_id = evaluation.get("variant_id")
+            score = evaluation.get("score")
+            if variant_id is None or score is None:
+                continue
+            scores_by_variant.setdefault(variant_id, []).append(score)
+
+            criteria = (evaluation.get("result_data") or {}).get("criteria_scores", {})
+            innovation = criteria.get("innovation")
+            if innovation is not None:
+                innovation_by_variant.setdefault(variant_id, []).append(innovation)
+
+        content_counts = Counter(
+            v.get("content_hash") for v in variants if v.get("content_hash")
+        )
+        parent_counts = Counter(
+            v.get("parent_id") or "root" for v in variants
+        )
+
+        weights = policy_config.get("objective_weights", {})
+        if not weights:
+            weights = self._build_objective_weights(
+                float(policy_config.get("selection_pressure", 0.5))
+            )
+
+        ranked = []
+        for variant in variants:
+            variant_id = variant.get("id")
+            if not variant_id:
+                continue
+
+            eval_scores = scores_by_variant.get(variant_id, [])
+            evaluation_score = sum(eval_scores) / len(eval_scores) if eval_scores else 0.0
+
+            innovation_scores = innovation_by_variant.get(variant_id, [])
+            innovation = sum(innovation_scores) / len(innovation_scores) if innovation_scores else evaluation_score
+
+            content_hash = variant.get("content_hash")
+            novelty = 1.0 / content_counts.get(content_hash, 1) if content_hash else 0.5
+
+            parent_key = variant.get("parent_id") or "root"
+            diversity = 1.0 / parent_counts.get(parent_key, 1)
+
+            composite_score = (
+                evaluation_score * weights.get("evaluation_score", 0.0)
+                + novelty * weights.get("novelty", 0.0)
+                + diversity * weights.get("diversity", 0.0)
+                + innovation * weights.get("innovation", 0.0)
+            )
+
+            ranked.append({
+                "variant_id": variant_id,
+                "parent_id": variant.get("parent_id"),
+                "evaluation_score": evaluation_score,
+                "novelty": novelty,
+                "diversity": diversity,
+                "innovation": innovation,
+                "composite_score": composite_score,
+            })
+
+        ranked.sort(key=lambda item: item["composite_score"], reverse=True)
+        return ranked
+
+    def _select_with_diversity(
+        self,
+        ranked: List[Dict[str, Any]],
+        select_count: int,
+        min_lineages: int
+    ) -> List[UUID]:
+        """Select top variants while preserving lineage diversity."""
+        selected: List[UUID] = []
+        selected_ids = set()
+        selected_parents = set()
+
+        for candidate in ranked:
+            if len(selected) >= select_count:
+                break
+            parent_key = candidate.get("parent_id") or "root"
+            if parent_key not in selected_parents:
+                selected_parents.add(parent_key)
+                variant_id = UUID(candidate["variant_id"])
+                selected.append(variant_id)
+                selected_ids.add(candidate["variant_id"])
+                if len(selected_parents) >= min_lineages:
+                    break
+
+        for candidate in ranked:
+            if len(selected) >= select_count:
+                break
+            if candidate["variant_id"] in selected_ids:
+                continue
+            variant_id = UUID(candidate["variant_id"])
+            selected.append(variant_id)
+            selected_ids.add(candidate["variant_id"])
+
+        return selected
+
     def _create_tournament_policy(
         self,
         winners: int,
@@ -329,31 +471,23 @@ Output: Selection policy with clear rules and parameters.
         )
 
         # Get policy
-        policy_context = AgentContext(
-            trace_id=context.trace_id,
-            campaign_id=context.campaign_id,
-            policy_id=policy_id
-        )
-        # Would get policy from repo here, but using context for simplicity
+        async with get_session() as session:
+            policy_repo = PostgresPolicyRepository(session)
+            policy = await policy_repo.get_by_id(policy_id)
+            if not policy:
+                raise ValueError(f"Policy {policy_id} not found")
 
         # Get variants and evaluations
         variants = await self._call_tool("get_round_variants", context)
         evaluations = await self._call_tool("get_round_evaluations", context)
 
-        # Get variant IDs
-        variant_ids = [UUID(v["id"]) for v in variants]
-
-        # Compare scores
-        comparison = await self._call_tool(
-            "compare_scores",
-            context,
-            variant_ids=variant_ids
+        ranked = self._rank_variants(variants, evaluations, policy.config)
+        select_count = min(
+            int(policy.config.get("selection_count", len(ranked))),
+            len(ranked)
         )
-
-        # Select top variants (simplified - would apply actual policy logic)
-        ranked = comparison.get("ranked", [])
-        select_count = min(5, len(ranked))  # Simplified selection
-        selected_ids = [UUID(v["variant_id"]) for v in ranked[:select_count]]
+        min_lineages = int(policy.config.get("parameters", {}).get("min_lineages", 1))
+        selected_ids = self._select_with_diversity(ranked, select_count, min_lineages)
 
         # Mark variants as selected
         async with get_session() as session:

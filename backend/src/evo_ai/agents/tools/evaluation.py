@@ -3,6 +3,8 @@
 Allows agents to run evaluations on variants and retrieve results.
 """
 
+import hashlib
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -65,6 +67,12 @@ class EvaluationTool:
                 }
             )
         """
+        evaluation_config = evaluation_config or {}
+
+        def _config_hash(config: Dict[str, Any]) -> str:
+            payload = json.dumps(config or {}, sort_keys=True, default=str)
+            return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
         async with get_session() as session:
             repo = PostgresEvaluationRepository(session)
             variant_repo = PostgresVariantRepository(session)
@@ -73,6 +81,29 @@ class EvaluationTool:
             if not variant:
                 raise ValueError(f"Variant {variant_id} not found")
 
+            config_hash = _config_hash(evaluation_config)
+            existing_evals = await repo.get_by_variant_id(variant_id)
+            for existing in existing_evals:
+                if existing.evaluator_type != evaluator_type:
+                    continue
+                if existing.status != EvaluationStatus.COMPLETED:
+                    continue
+                existing_hash = existing.metadata.get("config_hash")
+                if existing_hash is None:
+                    existing_hash = _config_hash(existing.evaluation_config or {})
+                if existing_hash == config_hash:
+                    return {
+                        "evaluation_id": str(existing.id),
+                        "variant_id": str(existing.variant_id),
+                        "evaluator_type": existing.evaluator_type,
+                        "status": existing.status.value,
+                        "created_at": existing.created_at.isoformat(),
+                        "completed_at": existing.completed_at.isoformat() if existing.completed_at else None,
+                        "score": existing.score,
+                        "result_data": existing.result_data,
+                        "cached": True,
+                    }
+
             # Create evaluation in pending state
             evaluation = Evaluation(
                 variant_id=variant_id,
@@ -80,7 +111,10 @@ class EvaluationTool:
                 evaluator_type=evaluator_type,
                 evaluation_config=evaluation_config,
                 status=EvaluationStatus.PENDING,
-                metadata=metadata or {},
+                metadata={
+                    **(metadata or {}),
+                    "config_hash": config_hash,
+                },
             )
 
             saved_eval = await repo.create(evaluation)
@@ -99,6 +133,7 @@ class EvaluationTool:
                 "evaluator_type": saved_eval.evaluator_type,
                 "status": saved_eval.status.value,
                 "created_at": saved_eval.created_at.isoformat(),
+                "cached": False,
             }
 
     @staticmethod
@@ -186,6 +221,8 @@ class EvaluationTool:
                     "score": e.score,
                     "status": e.status.value,
                     "result_data": e.result_data,
+                    "evaluation_config": e.evaluation_config,
+                    "metadata": e.metadata,
                     "created_at": e.created_at.isoformat(),
                     "completed_at": e.completed_at.isoformat() if e.completed_at else None,
                 }
@@ -248,6 +285,7 @@ class EvaluationTool:
                         "evaluator_type": e.evaluator_type,
                         "score": e.score,
                         "status": e.status.value,
+                        "result_data": e.result_data,
                     }
                     for e in all_evaluations
                 ]

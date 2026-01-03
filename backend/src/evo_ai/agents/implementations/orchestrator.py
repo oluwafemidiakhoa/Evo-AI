@@ -169,12 +169,12 @@ class AgentOrchestrator:
                 trace_id=str(trace_id)
             )
             evaluation_strategy = plan.get("evaluation_strategy", {})
-            evaluator_type = evaluation_strategy.get("evaluators", ["llm_judge"])[0]
 
             eval_results = await self.scorer.evaluate_batch(
                 context,
                 variant_ids=variant_ids,
-                evaluator_type=evaluator_type
+                evaluator_type=evaluation_strategy.get("primary_evaluator", "llm_judge"),
+                evaluation_config=evaluation_strategy
             )
 
             # Step 5: Apply selection policy

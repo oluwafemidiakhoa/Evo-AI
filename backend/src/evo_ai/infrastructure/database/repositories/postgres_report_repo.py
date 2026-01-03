@@ -1,5 +1,6 @@
 """PostgreSQL implementation of Report repository."""
 
+import json
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
@@ -38,31 +39,37 @@ class PostgresReportRepository:
     async def get_by_id(self, entity_id: UUID) -> Optional[Report]:
         """Retrieve report by ID."""
         result = await self.session.execute(
-            select(ReportDB).where(ReportDB.id == entity_id)
+            select(ReportDB, RoundDB.campaign_id)
+            .join(RoundDB, ReportDB.round_id == RoundDB.id)
+            .where(ReportDB.id == entity_id)
         )
-        db_report = result.scalar_one_or_none()
-        return self._to_domain(db_report) if db_report else None
+        row = result.one_or_none()
+        if not row:
+            return None
+        db_report, campaign_id = row
+        return self._to_domain(db_report, campaign_id)
 
     async def get_by_round_id(self, round_id: UUID) -> List[Report]:
         """Retrieve all reports for a round."""
         result = await self.session.execute(
-            select(ReportDB)
+            select(ReportDB, RoundDB.campaign_id)
+            .join(RoundDB, ReportDB.round_id == RoundDB.id)
             .where(ReportDB.round_id == round_id)
             .order_by(desc(ReportDB.created_at))
         )
-        db_reports = result.scalars().all()
-        return [self._to_domain(db_r) for db_r in db_reports]
+        rows = result.all()
+        return [self._to_domain(db_r, campaign_id) for db_r, campaign_id in rows]
 
     async def get_by_campaign_id(self, campaign_id: UUID) -> List[Report]:
         """Retrieve all reports for a campaign."""
         result = await self.session.execute(
-            select(ReportDB)
+            select(ReportDB, RoundDB.campaign_id)
             .join(RoundDB, ReportDB.round_id == RoundDB.id)
             .where(RoundDB.campaign_id == campaign_id)
             .order_by(desc(ReportDB.created_at))
         )
-        db_reports = result.scalars().all()
-        return [self._to_domain(db_r) for db_r in db_reports]
+        rows = result.all()
+        return [self._to_domain(db_r, campaign_id) for db_r, campaign_id in rows]
 
     async def update(self, entity: Report) -> Report:
         """Update an existing report."""
@@ -86,14 +93,22 @@ class PostgresReportRepository:
         return self._to_domain(db_report)
 
     @staticmethod
-    def _to_domain(db_report: ReportDB) -> Report:
+    def _to_domain(db_report: ReportDB, campaign_id: Optional[UUID] = None) -> Report:
         """Convert database model to domain model."""
+        content = db_report.content
+        if db_report.format == "json" and isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except json.JSONDecodeError:
+                content = db_report.content
+
         return Report(
             id=db_report.id,
+            campaign_id=campaign_id,
             round_id=db_report.round_id,
             report_type=db_report.report_type,
             format=db_report.format,
-            content=db_report.content,
+            content=content,
             storage_path=db_report.storage_path,
             meta_data=db_report.meta_data,
             created_at=db_report.created_at,

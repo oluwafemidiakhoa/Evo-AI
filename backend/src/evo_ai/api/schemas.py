@@ -172,8 +172,8 @@ class ReportResponse(BaseModel):
     campaign_id: UUID
     round_id: Optional[UUID]
     report_type: str
-    content: Dict[str, Any]
-    metadata: Dict[str, Any]
+    content: Any
+    metadata: Dict[str, Any] = Field(validation_alias="meta_data")
     created_at: datetime
 
     class Config:
