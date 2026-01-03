@@ -204,6 +204,19 @@ Output: Selection policy with clear rules and parameters.
 
         async with get_session() as session:
             repo = PostgresPolicyRepository(session)
+            existing = await repo.get_by_campaign(
+                context.campaign_id,
+                policy_type=PolicyType.SELECTION,
+                active_only=False
+            )
+            next_version = max((p.version for p in existing), default=0) + 1
+
+            for existing_policy in existing:
+                if existing_policy.is_active:
+                    existing_policy.is_active = False
+                    await repo.update(existing_policy)
+
+            policy.version = next_version
             saved_policy = await repo.create(policy)
 
         # Log decision
