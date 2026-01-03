@@ -6,7 +6,7 @@ export interface Campaign {
   id: string
   name: string
   description: string | null
-  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  status: 'draft' | 'active' | 'paused' | 'completed' | 'failed'
   config: Record<string, any>
   created_at: string
   started_at: string | null
@@ -17,7 +17,15 @@ export interface Round {
   id: string
   campaign_id: string
   round_number: number
-  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  status:
+    | 'pending'
+    | 'planning'
+    | 'generating'
+    | 'evaluating'
+    | 'selecting'
+    | 'reporting'
+    | 'completed'
+    | 'failed'
   config: Record<string, any>
   started_at: string | null
   completed_at: string | null
@@ -51,7 +59,8 @@ export interface Report {
   campaign_id: string
   round_id: string | null
   report_type: string
-  content: Record<string, any>
+  format?: string
+  content: any
   metadata: Record<string, any>
   created_at: string
 }

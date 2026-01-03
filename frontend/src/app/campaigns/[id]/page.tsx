@@ -29,7 +29,7 @@ export default function CampaignDetailPage({
     () => roundsAPI.list(id)
   )
 
-  const { data: stats } = useSWR(
+  const { data: stats, mutate: mutateStats } = useSWR(
     campaign ? ['campaign-stats', id] : null,
     () => campaignsAPI.getStats(id)
   )
@@ -61,6 +61,8 @@ export default function CampaignDetailPage({
           clearInterval(pollInterval)
           setExecutingRound(null)
           mutateRounds()
+          mutateStats()
+          mutateCampaign()
           if (status.status === 'failed') {
             alert(`Round ${roundNumber} failed: ${status.error}`)
           }
@@ -87,6 +89,20 @@ export default function CampaignDetailPage({
       </div>
     )
   }
+
+  const roundsList = rounds || []
+  const maxRounds = campaign.config.max_rounds || 0
+  const rerunRound = roundsList.find(
+    (round: any) => round.status === 'pending' || round.status === 'failed'
+  )
+  const nextRoundNumber =
+    roundsList.length > 0
+      ? Math.max(...roundsList.map((round: any) => round.round_number)) + 1
+      : 1
+  const targetRoundNumber = rerunRound?.round_number ?? nextRoundNumber
+  const canExecuteNext =
+    campaign.status === 'active' &&
+    (maxRounds === 0 || targetRoundNumber <= maxRounds)
 
   return (
     <div className="container mx-auto py-8">
@@ -217,12 +233,12 @@ export default function CampaignDetailPage({
         </CardContent>
       </Card>
 
-      {campaign.status === 'pending' && (
+      {campaign.status === 'draft' && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Start Campaign</CardTitle>
             <CardDescription>
-              Campaign is ready to start. Click below to begin execution.
+              Campaign is ready to start. Click below to enable execution.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -280,10 +296,15 @@ export default function CampaignDetailPage({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Rounds</CardTitle>
-            {campaign.status === 'in_progress' && (
-              <Button size="sm" variant="outline">
+            {campaign.status === 'active' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleExecuteRound(targetRoundNumber)}
+                disabled={!canExecuteNext || executingRound === targetRoundNumber}
+              >
                 <Play className="mr-2 h-4 w-4" />
-                Execute Next Round
+                {executingRound === targetRoundNumber ? 'Executing...' : 'Execute Next Round'}
               </Button>
             )}
           </div>
@@ -319,7 +340,7 @@ export default function CampaignDetailPage({
                     <Badge className={getStatusColor(round.status)}>
                       {round.status}
                     </Badge>
-                    {round.status === 'pending' && (
+                    {(round.status === 'pending' || round.status === 'failed') && (
                       <Button
                         size="sm"
                         onClick={() => handleExecuteRound(round.round_number)}

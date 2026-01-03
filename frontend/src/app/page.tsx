@@ -31,7 +31,7 @@ export default function DashboardPage() {
   const campaigns: Campaign[] = campaignsData?.campaigns || []
   const totalCampaigns = campaignsData?.total || 0
 
-  const activeCampaigns = campaigns.filter((c) => c.status === "in_progress").length
+  const activeCampaigns = campaigns.filter((c) => c.status === "active").length
   const completedCampaigns = campaigns.filter((c) => c.status === "completed").length
 
   const totalVariants = variantsData?.total || 0

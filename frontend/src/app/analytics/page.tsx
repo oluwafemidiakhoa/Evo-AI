@@ -25,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { getStatusColor } from "@/lib/utils"
 import type { Campaign, Variant } from "@/types"
 
 export default function AnalyticsPage() {
@@ -45,15 +46,16 @@ export default function AnalyticsPage() {
 
   // Calculate overall statistics
   const totalCampaigns = campaigns.length
-  const activeCampaigns = campaigns.filter((c) => c.status === "in_progress").length
+  const activeCampaigns = campaigns.filter((c) => c.status === "active").length
   const completedCampaigns = campaigns.filter((c) => c.status === "completed").length
   const totalVariants = allVariants.length
   const selectedVariants = allVariants.filter((v) => v.is_selected).length
 
   // Campaign status distribution
   const statusData = [
-    { name: "Pending", value: campaigns.filter((c) => c.status === "pending").length, color: "#94a3b8" },
-    { name: "In Progress", value: activeCampaigns, color: "#3b82f6" },
+    { name: "Draft", value: campaigns.filter((c) => c.status === "draft").length, color: "#94a3b8" },
+    { name: "Active", value: activeCampaigns, color: "#3b82f6" },
+    { name: "Paused", value: campaigns.filter((c) => c.status === "paused").length, color: "#eab308" },
     { name: "Completed", value: completedCampaigns, color: "#22c55e" },
     { name: "Failed", value: campaigns.filter((c) => c.status === "failed").length, color: "#ef4444" },
   ].filter((d) => d.value > 0)
@@ -331,13 +333,7 @@ export default function AnalyticsPage() {
                         </div>
                       </div>
                       <Badge
-                        className={
-                          campaign.status === "completed"
-                            ? "bg-green-100 text-green-800"
-                            : campaign.status === "in_progress"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                        }
+                        className={getStatusColor(campaign.status)}
                       >
                         {campaign.status}
                       </Badge>

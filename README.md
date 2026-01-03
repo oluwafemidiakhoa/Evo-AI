@@ -26,6 +26,14 @@ Evo-AI now runs a research-grade evolution loop:
 - **Reproducible runs**: seeded plans, deterministic mutation distribution, plan hashing.
 - **Structured reports**: JSON reports with lineage + metrics for downstream analysis.
 
+## Innovation Highlights
+
+- **End-to-end lineage**: every variant is auditable (parent_id + generation).
+- **Run-level provenance**: `run_id` ties plans, evaluations, and reports together.
+- **Budgeted intelligence**: evaluation ensembles adapt to cost/latency constraints.
+- **Deterministic planning**: seeded mutation strategies and plan hashes.
+- **Research-grade outputs**: structured JSON reports for reproducibility.
+
 ## Advanced Configuration
 
 Use the campaign config to control evaluation ensembles, budgets, and reproducibility:
@@ -56,6 +64,22 @@ Use the campaign config to control evaluation ensembles, budgets, and reproducib
   }
 }
 ```
+
+## Campaign Lifecycle (UI + API)
+
+**Lifecycle states**:
+
+```
+draft → active → paused → completed/failed
+```
+
+**How to run from the UI**:
+1. Create a campaign (starts in `draft`)
+2. Click **Start Campaign** (moves to `active`)
+3. Click **Execute Next Round** to run rounds sequentially
+4. Watch rounds, reports, and stats update in real time
+
+If `max_rounds` is reached, execution stops automatically.
 
 ## What Does Evo-AI Actually Do?
 

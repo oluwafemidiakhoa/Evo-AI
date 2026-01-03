@@ -37,6 +37,11 @@ export default function ReportDetailPage({
     )
   }
 
+  const reportFormat =
+    report.format ||
+    report.metadata?.format ||
+    (typeof report.content === "string" ? "text" : "json")
+
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
@@ -60,7 +65,7 @@ export default function ReportDetailPage({
                 <Calendar className="h-4 w-4" />
                 {formatDate(report.created_at)}
               </div>
-              <Badge variant="secondary">{report.format}</Badge>
+              <Badge variant="secondary">{reportFormat}</Badge>
             </div>
           </div>
         </div>
@@ -73,11 +78,17 @@ export default function ReportDetailPage({
         </CardHeader>
         <CardContent>
           {report.content ? (
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {report.content}
-              </ReactMarkdown>
-            </div>
+            typeof report.content === "string" ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {report.content}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <pre className="text-sm rounded-lg bg-muted/50 p-4 overflow-auto">
+                {JSON.stringify(report.content, null, 2)}
+              </pre>
+            )
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No content available
