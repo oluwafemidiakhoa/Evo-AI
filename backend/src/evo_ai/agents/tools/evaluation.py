@@ -195,7 +195,7 @@ class EvaluationTool:
     @staticmethod
     async def get_round_evaluations(
         context: AgentContext,
-        round_id: UUID,
+        round_id: Optional[UUID] = None,
         evaluator_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -209,12 +209,16 @@ class EvaluationTool:
         Returns:
             Dictionary with aggregated evaluation data
         """
+        rid = round_id or context.round_id
+        if not rid:
+            raise ValueError("round_id not provided and not in context")
+
         async with get_session() as session:
             variant_repo = PostgresVariantRepository(session)
             eval_repo = PostgresEvaluationRepository(session)
 
             # Get all variants in round
-            variants = await variant_repo.get_by_round_id(round_id)
+            variants = await variant_repo.get_by_round_id(rid)
 
             # Get evaluations for each variant
             all_evaluations = []
@@ -229,7 +233,7 @@ class EvaluationTool:
             scores = [e.score for e in completed if e.score is not None]
 
             return {
-                "round_id": str(round_id),
+                "round_id": str(rid),
                 "total_evaluations": len(all_evaluations),
                 "completed": len(completed),
                 "pending": len([e for e in all_evaluations if e.status == EvaluationStatus.PENDING]),
