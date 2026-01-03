@@ -3,7 +3,7 @@
 Allows agents to trace variant ancestry and analyze evolutionary paths.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
@@ -31,7 +31,7 @@ class LineageTool:
     @staticmethod
     async def get_full_lineage(
         context: AgentContext,
-        variant_id: UUID
+        variant_id: Optional[UUID] = None
     ) -> Dict[str, Any]:
         """
         Get complete ancestry chain for a variant.
@@ -55,9 +55,13 @@ class LineageTool:
             #     "founder": gen0_variant
             # }
         """
+        vid = variant_id or context.variant_id
+        if not vid:
+            raise ValueError("variant_id not provided and not in context")
+
         async with get_session() as session:
             repo = PostgresVariantRepository(session)
-            lineage = await repo.get_lineage(variant_id)
+            lineage = await repo.get_lineage(vid)
 
             if not lineage:
                 return {
@@ -93,7 +97,7 @@ class LineageTool:
     @staticmethod
     async def get_descendants(
         context: AgentContext,
-        variant_id: UUID
+        variant_id: Optional[UUID] = None
     ) -> Dict[str, Any]:
         """
         Get all descendants of a variant.
@@ -105,9 +109,13 @@ class LineageTool:
         Returns:
             Dictionary with descendants list and count
         """
+        vid = variant_id or context.variant_id
+        if not vid:
+            raise ValueError("variant_id not provided and not in context")
+
         async with get_session() as session:
             repo = PostgresVariantRepository(session)
-            descendants = await repo.get_descendants(variant_id)
+            descendants = await repo.get_descendants(vid)
 
             return {
                 "descendants": [
@@ -126,7 +134,7 @@ class LineageTool:
     @staticmethod
     async def get_lineage_statistics(
         context: AgentContext,
-        variant_id: UUID
+        variant_id: Optional[UUID] = None
     ) -> Dict[str, Any]:
         """
         Get statistical analysis of a variant's lineage.
@@ -138,8 +146,12 @@ class LineageTool:
         Returns:
             Dictionary with lineage statistics
         """
-        lineage_result = await LineageTool.get_full_lineage(context, variant_id)
-        descendants_result = await LineageTool.get_descendants(context, variant_id)
+        vid = variant_id or context.variant_id
+        if not vid:
+            raise ValueError("variant_id not provided and not in context")
+
+        lineage_result = await LineageTool.get_full_lineage(context, vid)
+        descendants_result = await LineageTool.get_descendants(context, vid)
 
         lineage = lineage_result.get("lineage", [])
 
