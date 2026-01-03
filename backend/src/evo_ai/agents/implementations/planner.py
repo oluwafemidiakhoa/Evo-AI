@@ -16,8 +16,14 @@ from evo_ai.agents.base import BaseEvoAgent, AgentContext, AgentDecision
 from evo_ai.agents.tools import DomainQueryTool, LineageTool, EvaluationTool
 from evo_ai.domain.models.round import Round, RoundStatus
 from evo_ai.infrastructure.database.connection import get_session
+from evo_ai.infrastructure.database.repositories.postgres_evaluation_repo import (
+    PostgresEvaluationRepository
+)
 from evo_ai.infrastructure.database.repositories.postgres_round_repo import (
     PostgresRoundRepository
+)
+from evo_ai.infrastructure.database.repositories.postgres_variant_repo import (
+    PostgresVariantRepository
 )
 
 logger = structlog.get_logger(__name__)
@@ -294,7 +300,37 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
 
         async with get_session() as session:
             repo = PostgresRoundRepository(session)
-            saved_round = await repo.create(round_obj)
+            existing_rounds = await repo.get_by_campaign_id(context.campaign_id)
+            existing_round = next(
+                (r for r in existing_rounds if r.round_number == round_number),
+                None
+            )
+
+            if existing_round:
+                logger.info(
+                    "round_reuse_existing",
+                    round_id=str(existing_round.id),
+                    round_number=round_number,
+                    trace_id=str(context.trace_id)
+                )
+
+                variant_repo = PostgresVariantRepository(session)
+                eval_repo = PostgresEvaluationRepository(session)
+
+                existing_variants = await variant_repo.get_by_round_id(existing_round.id)
+                for variant in existing_variants:
+                    await variant_repo.delete(variant.id, soft=True)
+
+                await eval_repo.delete_by_round_id(existing_round.id)
+
+                existing_round.status = RoundStatus.PENDING
+                existing_round.plan = plan
+                existing_round.metrics = {}
+                existing_round.started_at = None
+                existing_round.completed_at = None
+                saved_round = await repo.update(existing_round)
+            else:
+                saved_round = await repo.create(round_obj)
 
         logger.info(
             "round_created",

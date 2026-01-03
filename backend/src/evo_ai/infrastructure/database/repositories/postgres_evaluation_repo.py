@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import desc, select
+from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from evo_ai.domain.models.evaluation import Evaluation, EvaluationStatus
@@ -93,6 +93,14 @@ class PostgresEvaluationRepository:
 
         await self.session.flush()
         return self._to_domain(db_evaluation)
+
+    async def delete_by_round_id(self, round_id: UUID) -> int:
+        """Delete evaluations for a round (hard delete)."""
+        result = await self.session.execute(
+            delete(EvaluationDB).where(EvaluationDB.round_id == round_id)
+        )
+        await self.session.flush()
+        return result.rowcount or 0
 
     @staticmethod
     def _to_domain(db_evaluation: EvaluationDB) -> Evaluation:
