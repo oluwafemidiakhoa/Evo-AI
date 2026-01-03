@@ -62,7 +62,7 @@ class RoundResponse(BaseModel):
     campaign_id: UUID
     round_number: int
     status: str
-    config: Dict[str, Any]
+    config: Optional[Dict[str, Any]] = Field(default=None, validation_alias="plan")
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
 
