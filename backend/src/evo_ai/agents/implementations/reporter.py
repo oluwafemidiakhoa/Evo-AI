@@ -7,6 +7,7 @@ Responsibilities:
 - Export results in multiple formats
 """
 
+import json
 from datetime import datetime
 from typing import Any, Callable, Dict, List
 from uuid import UUID
@@ -19,6 +20,12 @@ from evo_ai.domain.models.report import Report, ReportType
 from evo_ai.infrastructure.database.connection import get_session
 from evo_ai.infrastructure.database.repositories.postgres_report_repo import (
     PostgresReportRepository
+)
+from evo_ai.infrastructure.database.repositories.postgres_round_repo import (
+    PostgresRoundRepository
+)
+from evo_ai.infrastructure.database.repositories.postgres_variant_repo import (
+    PostgresVariantRepository
 )
 
 logger = structlog.get_logger(__name__)
@@ -136,6 +143,8 @@ Output: Structured report with metrics, visualizations, and insights.
         )
 
         # Generate report based on type
+        report_round_id = context.round_id
+
         if report_type == ReportType.ROUND_SUMMARY:
             if not context.round_id:
                 raise ValueError("round_id required for round summary")
@@ -149,6 +158,7 @@ Output: Structured report with metrics, visualizations, and insights.
             if not variant_id:
                 raise ValueError("variant_id required for lineage analysis")
             content = await self._generate_lineage_analysis(context, variant_id)
+            report_round_id = await self._get_round_id_for_variant(variant_id)
 
         elif report_type == ReportType.FINAL_REPORT:
             content = await self._generate_final_report(context)
@@ -156,13 +166,18 @@ Output: Structured report with metrics, visualizations, and insights.
         else:
             raise ValueError(f"Unknown report type: {report_type}")
 
+        if not report_round_id:
+            report_round_id = await self._get_latest_round_id(context.campaign_id)
+
+        serialized_content = json.dumps(content, ensure_ascii=True)
+
         # Create report entity
         report = Report(
-            campaign_id=context.campaign_id,
-            round_id=context.round_id,
-            report_type=report_type,
-            content=content,
-            metadata={
+            round_id=report_round_id,
+            report_type=report_type.value,
+            format="json",
+            content=serialized_content,
+            meta_data={
                 "generated_at": datetime.utcnow().isoformat(),
                 "report_version": "1.0",
             }
@@ -182,7 +197,7 @@ Output: Structured report with metrics, visualizations, and insights.
             },
             output_data={
                 "report_id": str(saved_report.id),
-                "content_size": len(str(content)),
+                "content_size": len(serialized_content),
             },
             reasoning=f"Generated {report_type.value} report",
             confidence_score=0.9,
@@ -204,6 +219,24 @@ Output: Structured report with metrics, visualizations, and insights.
             "generated_at": saved_report.created_at.isoformat(),
         }
 
+    async def _get_latest_round_id(self, campaign_id: UUID) -> UUID:
+        """Fetch latest round ID for a campaign."""
+        async with get_session() as session:
+            round_repo = PostgresRoundRepository(session)
+            latest_round = await round_repo.get_latest_round(campaign_id)
+            if not latest_round:
+                raise ValueError("No rounds found for campaign report")
+            return latest_round.id
+
+    async def _get_round_id_for_variant(self, variant_id: UUID) -> UUID:
+        """Fetch round ID for a variant."""
+        async with get_session() as session:
+            variant_repo = PostgresVariantRepository(session)
+            variant = await variant_repo.get_by_id(variant_id)
+            if not variant:
+                raise ValueError(f"Variant {variant_id} not found for report")
+            return variant.round_id
+
     async def _generate_round_summary(self, context: AgentContext) -> Dict[str, Any]:
         """Generate round summary report."""
         variants = await self._call_tool("get_round_variants", context)
@@ -213,7 +246,7 @@ Output: Structured report with metrics, visualizations, and insights.
         selected_variants = [v for v in variants if v.get("is_selected")]
 
         # Get evaluation summary
-        eval_summary = evaluations.get("results", [])
+        eval_summary = evaluations.get("evaluations", [])
         avg_score = evaluations.get("average_score", 0)
         min_score = evaluations.get("min_score", 0)
         max_score = evaluations.get("max_score", 0)

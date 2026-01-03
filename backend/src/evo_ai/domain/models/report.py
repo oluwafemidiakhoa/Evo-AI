@@ -16,6 +16,8 @@ class ReportType(str, Enum):
     LINEAGE_ANALYSIS = "lineage_analysis"
     CAMPAIGN_SUMMARY = "campaign_summary"
     VARIANT_COMPARISON = "variant_comparison"
+    CAMPAIGN_PROGRESS = "campaign_progress"
+    FINAL_REPORT = "final_report"
 
 
 class Report(BaseModel):
