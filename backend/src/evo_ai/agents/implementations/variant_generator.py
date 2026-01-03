@@ -139,7 +139,8 @@ Output: New variant with content, mutation metadata, and lineage info.
         parent_context = AgentContext(
             trace_id=context.trace_id,
             campaign_id=context.campaign_id,
-            variant_id=parent_id
+            run_id=context.run_id,
+            variant_id=parent_id,
         )
         parent_data = await self._call_tool("get_variant", parent_context)
         parent_content = parent_data["content"]

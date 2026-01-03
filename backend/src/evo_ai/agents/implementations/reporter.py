@@ -172,15 +172,19 @@ Output: Structured report with metrics, visualizations, and insights.
         serialized_content = json.dumps(content, ensure_ascii=True)
 
         # Create report entity
+        report_meta = {
+            "generated_at": datetime.utcnow().isoformat(),
+            "report_version": "1.0",
+        }
+        if context.run_id or context.metadata.get("run_id"):
+            report_meta["run_id"] = str(context.run_id or context.metadata.get("run_id"))
+
         report = Report(
             round_id=report_round_id,
             report_type=report_type.value,
             format="json",
             content=serialized_content,
-            meta_data={
-                "generated_at": datetime.utcnow().isoformat(),
-                "report_version": "1.0",
-            }
+            meta_data=report_meta,
         )
 
         async with get_session() as session:
@@ -305,7 +309,8 @@ Output: Structured report with metrics, visualizations, and insights.
                 round_context = AgentContext(
                     trace_id=context.trace_id,
                     campaign_id=context.campaign_id,
-                    round_id=round_id
+                    run_id=context.run_id,
+                    round_id=round_id,
                 )
                 evals = await self._call_tool("get_round_evaluations", round_context)
                 if evals.get("average_score"):
@@ -357,7 +362,8 @@ Output: Structured report with metrics, visualizations, and insights.
         variant_context = AgentContext(
             trace_id=context.trace_id,
             campaign_id=context.campaign_id,
-            variant_id=variant_id
+            run_id=context.run_id,
+            variant_id=variant_id,
         )
 
         lineage = await self._call_tool("get_lineage", variant_context)

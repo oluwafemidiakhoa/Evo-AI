@@ -7,6 +7,7 @@ Responsibilities:
 - Ensure proper sequencing and error handling
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -80,7 +81,8 @@ class AgentOrchestrator:
         self,
         campaign_id: UUID,
         round_number: int,
-        trace_id: Optional[UUID] = None
+        trace_id: Optional[UUID] = None,
+        run_id: Optional[UUID] = None
     ) -> Dict[str, Any]:
         """
         Execute a complete experiment round.
@@ -116,7 +118,10 @@ class AgentOrchestrator:
         context = AgentContext(
             trace_id=trace_id,
             campaign_id=campaign_id,
+            run_id=run_id,
         )
+        if run_id:
+            context.metadata["run_id"] = str(run_id)
 
         try:
             # Step 1: Plan round
@@ -252,7 +257,8 @@ class AgentOrchestrator:
     async def execute_campaign(
         self,
         campaign_id: UUID,
-        max_rounds: Optional[int] = None
+        max_rounds: Optional[int] = None,
+        run_id: Optional[UUID] = None
     ) -> Dict[str, Any]:
         """
         Execute complete campaign (multiple rounds).
@@ -265,6 +271,7 @@ class AgentOrchestrator:
             Campaign execution results
         """
         trace_id = uuid4()
+        run_id = run_id or uuid4()
 
         logger.info(
             "campaign_execution_started",
@@ -282,6 +289,11 @@ class AgentOrchestrator:
 
             # Update status to ACTIVE while executing rounds
             campaign.status = CampaignStatus.ACTIVE
+            campaign.metadata = {
+                **(campaign.metadata or {}),
+                "last_run_id": str(run_id),
+                "last_run_started_at": datetime.utcnow().isoformat(),
+            }
             await campaign_repo.update(campaign)
 
             # Get max_rounds from config if not provided
@@ -303,7 +315,8 @@ class AgentOrchestrator:
                 round_result = await self.execute_round(
                     campaign_id=campaign_id,
                     round_number=round_number,
-                    trace_id=trace_id
+                    trace_id=trace_id,
+                    run_id=run_id
                 )
                 round_results.append(round_result)
 
@@ -320,8 +333,10 @@ class AgentOrchestrator:
             # Generate final report
             context = AgentContext(
                 trace_id=trace_id,
-                campaign_id=campaign_id
+                campaign_id=campaign_id,
+                run_id=run_id,
             )
+            context.metadata["run_id"] = str(run_id)
             final_report = await self.reporter.execute(
                 context,
                 report_type=ReportType.FINAL_REPORT
@@ -332,6 +347,12 @@ class AgentOrchestrator:
                 campaign_repo = PostgresCampaignRepository(session)
                 campaign = await campaign_repo.get_by_id(campaign_id)
                 campaign.status = CampaignStatus.COMPLETED
+                campaign.metadata = {
+                    **(campaign.metadata or {}),
+                    "last_run_id": str(run_id),
+                    "last_run_status": "completed",
+                    "last_run_completed_at": datetime.utcnow().isoformat(),
+                }
                 await campaign_repo.update(campaign)
 
             logger.info(
@@ -364,6 +385,12 @@ class AgentOrchestrator:
                 campaign = await campaign_repo.get_by_id(campaign_id)
                 if campaign:
                     campaign.status = CampaignStatus.FAILED
+                    campaign.metadata = {
+                        **(campaign.metadata or {}),
+                        "last_run_id": str(run_id),
+                        "last_run_status": "failed",
+                        "last_run_completed_at": datetime.utcnow().isoformat(),
+                    }
                     await campaign_repo.update(campaign)
 
             raise

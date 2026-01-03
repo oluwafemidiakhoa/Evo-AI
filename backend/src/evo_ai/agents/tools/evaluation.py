@@ -73,6 +73,7 @@ class EvaluationTool:
             payload = json.dumps(config or {}, sort_keys=True, default=str)
             return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+        run_id = context.run_id or context.metadata.get("run_id")
         async with get_session() as session:
             repo = PostgresEvaluationRepository(session)
             variant_repo = PostgresVariantRepository(session)
@@ -113,6 +114,7 @@ class EvaluationTool:
                 status=EvaluationStatus.PENDING,
                 metadata={
                     **(metadata or {}),
+                    **({"run_id": str(run_id)} if run_id else {}),
                     "config_hash": config_hash,
                 },
             )
@@ -167,7 +169,10 @@ class EvaluationTool:
             evaluation.score = score
             evaluation.result_data = result_data
             evaluation.status = status
-            evaluation.completed_at = datetime.utcnow() if status == EvaluationStatus.COMPLETED else None
+            if status in (EvaluationStatus.COMPLETED, EvaluationStatus.FAILED):
+                evaluation.completed_at = datetime.utcnow()
+            else:
+                evaluation.completed_at = None
 
             updated = await repo.update(evaluation)
 

@@ -33,6 +33,7 @@ class AgentContext:
     Attributes:
         trace_id: OpenTelemetry trace ID for correlation
         campaign_id: Campaign being processed
+        run_id: Execution run ID (optional)
         round_id: Current round (optional)
         variant_id: Current variant (optional)
         policy_id: Current policy (optional)
@@ -40,6 +41,7 @@ class AgentContext:
     """
     trace_id: UUID
     campaign_id: UUID
+    run_id: Optional[UUID] = None
     round_id: Optional[UUID] = None
     variant_id: Optional[UUID] = None
     policy_id: Optional[UUID] = None
@@ -234,6 +236,13 @@ class BaseEvoAgent(ABC):
             PostgresAgentDecisionRepository
         )
         from evo_ai.domain.models.agent_decision import AgentDecision as AgentDecisionModel
+
+        run_id = context.run_id or context.metadata.get("run_id")
+        if run_id:
+            decision.metadata = {
+                **decision.metadata,
+                "run_id": str(run_id),
+            }
 
         # Create domain model
         decision_model = AgentDecisionModel(

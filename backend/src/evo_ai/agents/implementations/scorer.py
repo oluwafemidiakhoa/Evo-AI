@@ -137,17 +137,30 @@ Output: Evaluation results with scores, feedback, and confidence.
         variant_context = AgentContext(
             trace_id=context.trace_id,
             campaign_id=context.campaign_id,
-            variant_id=variant_id
+            run_id=context.run_id,
+            variant_id=variant_id,
         )
         variant = await self._call_tool("get_variant", variant_context)
         lineage = await self._call_tool("get_lineage", variant_context)
+
+        effective_evaluator, estimate, budget_info = self._select_evaluator(
+            evaluator_type,
+            variant,
+            evaluation_config
+        )
+
+        if budget_info.get("fallback_from"):
+            evaluation_config = {
+                **evaluation_config,
+                "fallback_from": budget_info["fallback_from"],
+            }
 
         # Create evaluation record (may return cached result)
         eval_result = await self._call_tool(
             "create_evaluation",
             variant_context,
             variant_id=variant_id,
-            evaluator_type=evaluator_type,
+            evaluator_type=effective_evaluator,
             evaluation_config=evaluation_config
         )
         evaluation_id = UUID(eval_result["evaluation_id"])
@@ -162,34 +175,74 @@ Output: Evaluation results with scores, feedback, and confidence.
                 "criteria_scores": cached_data.get("criteria_scores", {}),
                 "confidence": 0.95,
                 "cached": True,
+                "execution": estimate,
+                "budget": budget_info,
+            }
+
+        if budget_info.get("blocked"):
+            from evo_ai.domain.models.evaluation import EvaluationStatus
+
+            eval_context = AgentContext(
+                trace_id=context.trace_id,
+                campaign_id=context.campaign_id,
+                run_id=context.run_id,
+            )
+            result_data = {
+                "feedback": "Evaluation blocked by budget constraints.",
+                "criteria_scores": {"budget_exceeded": 1.0},
+                "lineage_context": {
+                    "generation": variant["generation"],
+                    "lineage_depth": lineage.get("generations", 0),
+                },
+                "execution": estimate,
+                "budget": budget_info,
+            }
+            await self._call_tool(
+                "update_evaluation",
+                eval_context,
+                evaluation_id=evaluation_id,
+                score=0.0,
+                result_data=result_data,
+                status=EvaluationStatus.FAILED
+            )
+
+            return {
+                "evaluation_id": str(evaluation_id),
+                "variant_id": str(variant_id),
+                "score": 0.0,
+                "feedback": result_data["feedback"],
+                "criteria_scores": result_data["criteria_scores"],
+                "confidence": 0.2,
+                "blocked": True,
             }
 
         # Execute evaluation based on type
-        if evaluator_type == "llm_judge":
+        if effective_evaluator == "llm_judge":
             score, feedback, criteria = await self._evaluate_with_llm(
                 variant, lineage, evaluation_config
             )
-        elif evaluator_type == "unit_test":
+        elif effective_evaluator == "unit_test":
             score, feedback, criteria = await self._evaluate_with_tests(
                 variant, lineage, evaluation_config
             )
-        elif evaluator_type == "benchmark":
+        elif effective_evaluator == "benchmark":
             score, feedback, criteria = await self._evaluate_with_benchmark(
                 variant, lineage, evaluation_config
             )
-        elif evaluator_type == "ensemble":
+        elif effective_evaluator == "ensemble":
             score, feedback, criteria = await self._evaluate_with_ensemble(
                 variant, lineage, evaluation_config
             )
         else:
-            raise ValueError(f"Unknown evaluator type: {evaluator_type}")
+            raise ValueError(f"Unknown evaluator type: {effective_evaluator}")
 
         # Update evaluation with results
         from evo_ai.domain.models.evaluation import EvaluationStatus
 
         eval_context = AgentContext(
             trace_id=context.trace_id,
-            campaign_id=context.campaign_id
+            campaign_id=context.campaign_id,
+            run_id=context.run_id,
         )
         await self._call_tool(
             "update_evaluation",
@@ -202,7 +255,9 @@ Output: Evaluation results with scores, feedback, and confidence.
                 "lineage_context": {
                     "generation": variant["generation"],
                     "lineage_depth": lineage.get("generations", 0),
-                }
+                },
+                "execution": estimate,
+                "budget": budget_info,
             },
             status=EvaluationStatus.COMPLETED
         )
@@ -213,7 +268,7 @@ Output: Evaluation results with scores, feedback, and confidence.
             decision_type="variant_evaluated",
             input_data={
                 "variant_id": str(variant_id),
-                "evaluator_type": evaluator_type,
+                "evaluator_type": effective_evaluator,
                 "generation": variant["generation"],
             },
             output_data={
@@ -288,6 +343,92 @@ Output: Evaluation results with scores, feedback, and confidence.
         )
 
         return score, feedback, criteria
+
+    def _estimate_execution(
+        self,
+        content: str,
+        evaluator_type: str,
+        config: Dict[str, Any]
+    ) -> Dict[str, float]:
+        """Estimate cost and latency for an evaluator."""
+        tokens = max(len(content) // 4, 1)
+
+        if evaluator_type == "ensemble":
+            ensemble = config.get("ensemble", [])
+            total_cost = 0.0
+            total_latency = 0.0
+            for component in ensemble:
+                comp_type = component.get("type", "llm_judge")
+                comp_config = component.get("config", {})
+                estimate = self._estimate_execution(content, comp_type, comp_config)
+                total_cost += estimate["cost_usd"]
+                total_latency += estimate["latency_ms"]
+            return {
+                "estimated_tokens": float(tokens),
+                "cost_usd": total_cost,
+                "latency_ms": total_latency,
+            }
+
+        if evaluator_type == "llm_judge":
+            cost_per_1k = float(config.get("cost_per_1k_tokens", 0.002))
+            latency_base = float(config.get("latency_base_ms", 800))
+            latency_per_token = float(config.get("latency_per_token_ms", 0.4))
+            cost = (tokens / 1000.0) * cost_per_1k
+            latency = latency_base + (tokens * latency_per_token)
+        elif evaluator_type == "benchmark":
+            cost = 0.0
+            latency_base = float(config.get("latency_base_ms", 500))
+            latency_per_token = float(config.get("latency_per_token_ms", 0.2))
+            latency = latency_base + (tokens * latency_per_token)
+        else:  # unit_test or fallback
+            cost = 0.0
+            latency_base = float(config.get("latency_base_ms", 200))
+            latency_per_token = float(config.get("latency_per_token_ms", 0.1))
+            latency = latency_base + (tokens * latency_per_token)
+
+        return {
+            "estimated_tokens": float(tokens),
+            "cost_usd": float(cost),
+            "latency_ms": float(latency),
+        }
+
+    def _select_evaluator(
+        self,
+        evaluator_type: str,
+        variant: Dict[str, Any],
+        config: Dict[str, Any]
+    ) -> tuple[str, Dict[str, float], Dict[str, Any]]:
+        """Select evaluator based on budget and latency constraints."""
+        max_cost = config.get("max_cost_usd")
+        max_latency = config.get("max_latency_ms")
+        allow_over_budget = bool(config.get("allow_over_budget", False))
+        fallback = config.get("fallback_evaluator")
+
+        estimate = self._estimate_execution(variant["content"], evaluator_type, config)
+        over_cost = max_cost is not None and estimate["cost_usd"] > float(max_cost)
+        over_latency = max_latency is not None and estimate["latency_ms"] > float(max_latency)
+        over_budget = over_cost or over_latency
+
+        if over_budget and fallback:
+            fallback_estimate = self._estimate_execution(variant["content"], fallback, config)
+            return fallback, fallback_estimate, {
+                "over_budget": True,
+                "fallback_from": evaluator_type,
+                "blocked": False,
+                "reason": "fallback_applied",
+            }
+
+        if over_budget and not allow_over_budget:
+            return evaluator_type, estimate, {
+                "over_budget": True,
+                "blocked": True,
+                "reason": "budget_exceeded",
+            }
+
+        return evaluator_type, estimate, {
+            "over_budget": over_budget,
+            "blocked": False,
+        }
 
     async def _evaluate_with_tests(
         self,

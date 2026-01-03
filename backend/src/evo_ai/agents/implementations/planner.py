@@ -146,7 +146,8 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
                 round_context = AgentContext(
                     trace_id=context.trace_id,
                     campaign_id=context.campaign_id,
-                    round_id=round_id
+                    run_id=context.run_id,
+                    round_id=round_id,
                 )
                 evals = await self._call_tool("get_round_evaluations", round_context)
                 if evals.get("average_score"):
@@ -234,8 +235,19 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
             "parallel_execution": True,
             "timeout_seconds": 300,
         }
+        budget_config = config.get("evaluation_budget", {})
+        evaluation_strategy.update({
+            "max_cost_usd": budget_config.get("max_cost_usd", config.get("max_cost_usd")),
+            "max_latency_ms": budget_config.get("max_latency_ms", config.get("max_latency_ms")),
+            "fallback_evaluator": budget_config.get("fallback_evaluator", config.get("fallback_evaluator")),
+            "allow_over_budget": budget_config.get("allow_over_budget", config.get("allow_over_budget", False)),
+            "cost_per_1k_tokens": budget_config.get("cost_per_1k_tokens", config.get("cost_per_1k_tokens", 0.002)),
+            "latency_base_ms": budget_config.get("latency_base_ms", config.get("latency_base_ms", 800)),
+            "latency_per_token_ms": budget_config.get("latency_per_token_ms", config.get("latency_per_token_ms", 0.4)),
+        })
 
         seed = config.get("seed", context.campaign_id.int % (2 ** 32))
+        run_id = context.run_id or context.metadata.get("run_id")
 
         # Build round plan
         round_plan = {
@@ -255,6 +267,8 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
                 "recent_scores": historical_scores,
             }
         }
+        if run_id:
+            round_plan["run_id"] = str(run_id)
         plan_hash = hashlib.sha256(
             json.dumps(round_plan, sort_keys=True, default=str).encode("utf-8")
         ).hexdigest()

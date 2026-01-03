@@ -16,6 +16,47 @@ Evo-AI is a production-ready platform that uses LLM agents and evolutionary algo
 
 **Try it yourself!** Create campaigns, execute evolution rounds, and watch AI agents optimize code in real-time.
 
+## Advanced Engine (Phase 2)
+
+Evo-AI now runs a research-grade evolution loop:
+
+- **Multi-objective selection**: balances score, novelty, diversity, and innovation.
+- **Ensemble evaluation**: combines LLM judge + tests/benchmarks with weighted scoring.
+- **Budget-aware evals**: cost/latency limits with deterministic fallback evaluators.
+- **Reproducible runs**: seeded plans, deterministic mutation distribution, plan hashing.
+- **Structured reports**: JSON reports with lineage + metrics for downstream analysis.
+
+## Advanced Configuration
+
+Use the campaign config to control evaluation ensembles, budgets, and reproducibility:
+
+```json
+{
+  "variants_per_round": 6,
+  "max_rounds": 10,
+  "seed": 1337,
+  "evaluators": ["llm_judge", "unit_test"],
+  "ensemble": [
+    { "type": "llm_judge", "weight": 0.7 },
+    { "type": "unit_test", "weight": 0.3 }
+  ],
+  "criteria_weights": {
+    "correctness": 0.35,
+    "code_quality": 0.25,
+    "performance": 0.2,
+    "innovation": 0.1,
+    "simplicity": 0.1
+  },
+  "evaluation_budget": {
+    "max_cost_usd": 0.05,
+    "max_latency_ms": 1500,
+    "fallback_evaluator": "unit_test",
+    "allow_over_budget": false,
+    "cost_per_1k_tokens": 0.002
+  }
+}
+```
+
 ## What Does Evo-AI Actually Do?
 
 Instead of manually optimizing code, Evo-AI:
