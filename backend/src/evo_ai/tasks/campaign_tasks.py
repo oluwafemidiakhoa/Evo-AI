@@ -2,6 +2,9 @@
 
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
+import asyncio
+import os
+import threading
 
 import ray
 import structlog
@@ -11,6 +14,66 @@ from evo_ai.mcp.registry import mcp_registry
 from evo_ai.tasks.job_tracker import job_tracker, JobStatus
 
 logger = structlog.get_logger(__name__)
+
+
+def _use_ray() -> bool:
+    """Return True when Ray should be used for execution."""
+    flag = os.getenv("EVO_AI_USE_RAY", "").strip().lower()
+    return flag in ("1", "true", "yes")
+
+
+def _run_round_local(
+    job_id: UUID,
+    campaign_id: UUID,
+    round_number: int,
+    trace_id: UUID
+) -> None:
+    """Run a round without Ray and update job status."""
+    job_tracker.update_status(job_id, JobStatus.RUNNING, progress=0.0)
+    try:
+        orchestrator = AgentOrchestrator(mcp_registry)
+        result = asyncio.run(
+            orchestrator.execute_round(
+                campaign_id=campaign_id,
+                round_number=round_number,
+                trace_id=trace_id
+            )
+        )
+        job_tracker.update_status(job_id, JobStatus.COMPLETED, progress=1.0, result=result)
+    except Exception as exc:
+        logger.error(
+            "local_round_execution_failed",
+            campaign_id=str(campaign_id),
+            round_number=round_number,
+            error=str(exc)
+        )
+        job_tracker.update_status(job_id, JobStatus.FAILED, error=str(exc))
+
+
+def _run_campaign_local(
+    job_id: UUID,
+    campaign_id: UUID,
+    max_rounds: Optional[int],
+    trace_id: UUID
+) -> None:
+    """Run a campaign without Ray and update job status."""
+    job_tracker.update_status(job_id, JobStatus.RUNNING, progress=0.0)
+    try:
+        orchestrator = AgentOrchestrator(mcp_registry)
+        result = asyncio.run(
+            orchestrator.execute_campaign(
+                campaign_id=campaign_id,
+                max_rounds=max_rounds
+            )
+        )
+        job_tracker.update_status(job_id, JobStatus.COMPLETED, progress=1.0, result=result)
+    except Exception as exc:
+        logger.error(
+            "local_campaign_execution_failed",
+            campaign_id=str(campaign_id),
+            error=str(exc)
+        )
+        job_tracker.update_status(job_id, JobStatus.FAILED, error=str(exc))
 
 
 @ray.remote
@@ -211,16 +274,36 @@ def execute_round_task(
         trace_id=trace_uuid
     )
 
-    # Submit to Ray
-    task_ref = execute_round_remote.remote(
-        campaign_id=str(campaign_id),
-        round_number=round_number,
-        trace_id=str(trace_uuid),
-        job_id=str(job.job_id)
-    )
+    if _use_ray():
+        try:
+            task_ref = execute_round_remote.remote(
+                campaign_id=str(campaign_id),
+                round_number=round_number,
+                trace_id=str(trace_uuid),
+                job_id=str(job.job_id)
+            )
+
+            if async_execution:
+                return {
+                    "job_id": str(job.job_id),
+                    "status": job.status.value,
+                    "task_type": "execute_round",
+                    "campaign_id": str(campaign_id),
+                    "round_number": round_number,
+                    "trace_id": str(trace_uuid)
+                }
+            result = ray.get(task_ref)
+            return result
+        except Exception as exc:
+            logger.warning("ray_unavailable_fallback", error=str(exc))
 
     if async_execution:
-        # Return immediately with job ID
+        thread = threading.Thread(
+            target=_run_round_local,
+            args=(job.job_id, campaign_id, round_number, trace_uuid),
+            daemon=True
+        )
+        thread.start()
         return {
             "job_id": str(job.job_id),
             "status": job.status.value,
@@ -229,10 +312,10 @@ def execute_round_task(
             "round_number": round_number,
             "trace_id": str(trace_uuid)
         }
-    else:
-        # Wait for completion
-        result = ray.get(task_ref)
-        return result
+
+    _run_round_local(job.job_id, campaign_id, round_number, trace_uuid)
+    status = job_tracker.get_job(job.job_id)
+    return status.result if status and status.result else {}
 
 
 def execute_campaign_task(
@@ -263,16 +346,36 @@ def execute_campaign_task(
         trace_id=trace_uuid
     )
 
-    # Submit to Ray
-    task_ref = execute_campaign_remote.remote(
-        campaign_id=str(campaign_id),
-        max_rounds=max_rounds,
-        trace_id=str(trace_uuid),
-        job_id=str(job.job_id)
-    )
+    if _use_ray():
+        try:
+            task_ref = execute_campaign_remote.remote(
+                campaign_id=str(campaign_id),
+                max_rounds=max_rounds,
+                trace_id=str(trace_uuid),
+                job_id=str(job.job_id)
+            )
+
+            if async_execution:
+                return {
+                    "job_id": str(job.job_id),
+                    "status": job.status.value,
+                    "task_type": "execute_campaign",
+                    "campaign_id": str(campaign_id),
+                    "max_rounds": max_rounds,
+                    "trace_id": str(trace_uuid)
+                }
+            result = ray.get(task_ref)
+            return result
+        except Exception as exc:
+            logger.warning("ray_unavailable_fallback", error=str(exc))
 
     if async_execution:
-        # Return immediately with job ID
+        thread = threading.Thread(
+            target=_run_campaign_local,
+            args=(job.job_id, campaign_id, max_rounds, trace_uuid),
+            daemon=True
+        )
+        thread.start()
         return {
             "job_id": str(job.job_id),
             "status": job.status.value,
@@ -281,10 +384,10 @@ def execute_campaign_task(
             "max_rounds": max_rounds,
             "trace_id": str(trace_uuid)
         }
-    else:
-        # Wait for completion
-        result = ray.get(task_ref)
-        return result
+
+    _run_campaign_local(job.job_id, campaign_id, max_rounds, trace_uuid)
+    status = job_tracker.get_job(job.job_id)
+    return status.result if status and status.result else {}
 
 
 def get_task_status(job_id: UUID) -> Optional[Dict[str, Any]]:
