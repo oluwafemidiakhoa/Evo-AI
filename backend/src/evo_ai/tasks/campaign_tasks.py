@@ -22,7 +22,7 @@ def _use_ray() -> bool:
     return flag in ("1", "true", "yes")
 
 
-def _run_round_local(
+async def _run_round_async(
     job_id: UUID,
     campaign_id: UUID,
     round_number: int,
@@ -32,12 +32,10 @@ def _run_round_local(
     job_tracker.update_status(job_id, JobStatus.RUNNING, progress=0.0)
     try:
         orchestrator = AgentOrchestrator(mcp_registry)
-        result = asyncio.run(
-            orchestrator.execute_round(
-                campaign_id=campaign_id,
-                round_number=round_number,
-                trace_id=trace_id
-            )
+        result = await orchestrator.execute_round(
+            campaign_id=campaign_id,
+            round_number=round_number,
+            trace_id=trace_id
         )
         job_tracker.update_status(job_id, JobStatus.COMPLETED, progress=1.0, result=result)
     except Exception as exc:
@@ -50,7 +48,7 @@ def _run_round_local(
         job_tracker.update_status(job_id, JobStatus.FAILED, error=str(exc))
 
 
-def _run_campaign_local(
+async def _run_campaign_async(
     job_id: UUID,
     campaign_id: UUID,
     max_rounds: Optional[int],
@@ -60,11 +58,9 @@ def _run_campaign_local(
     job_tracker.update_status(job_id, JobStatus.RUNNING, progress=0.0)
     try:
         orchestrator = AgentOrchestrator(mcp_registry)
-        result = asyncio.run(
-            orchestrator.execute_campaign(
-                campaign_id=campaign_id,
-                max_rounds=max_rounds
-            )
+        result = await orchestrator.execute_campaign(
+            campaign_id=campaign_id,
+            max_rounds=max_rounds
         )
         job_tracker.update_status(job_id, JobStatus.COMPLETED, progress=1.0, result=result)
     except Exception as exc:
@@ -74,6 +70,26 @@ def _run_campaign_local(
             error=str(exc)
         )
         job_tracker.update_status(job_id, JobStatus.FAILED, error=str(exc))
+
+
+def _run_round_local(
+    job_id: UUID,
+    campaign_id: UUID,
+    round_number: int,
+    trace_id: UUID
+) -> None:
+    """Fallback runner when no event loop is available."""
+    asyncio.run(_run_round_async(job_id, campaign_id, round_number, trace_id))
+
+
+def _run_campaign_local(
+    job_id: UUID,
+    campaign_id: UUID,
+    max_rounds: Optional[int],
+    trace_id: UUID
+) -> None:
+    """Fallback runner when no event loop is available."""
+    asyncio.run(_run_campaign_async(job_id, campaign_id, max_rounds, trace_id))
 
 
 @ray.remote
@@ -298,12 +314,23 @@ def execute_round_task(
             logger.warning("ray_unavailable_fallback", error=str(exc))
 
     if async_execution:
-        thread = threading.Thread(
-            target=_run_round_local,
-            args=(job.job_id, campaign_id, round_number, trace_uuid),
-            daemon=True
-        )
-        thread.start()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop:
+            loop.create_task(
+                _run_round_async(job.job_id, campaign_id, round_number, trace_uuid)
+            )
+        else:
+            thread = threading.Thread(
+                target=_run_round_local,
+                args=(job.job_id, campaign_id, round_number, trace_uuid),
+                daemon=True
+            )
+            thread.start()
+
         return {
             "job_id": str(job.job_id),
             "status": job.status.value,
@@ -370,12 +397,23 @@ def execute_campaign_task(
             logger.warning("ray_unavailable_fallback", error=str(exc))
 
     if async_execution:
-        thread = threading.Thread(
-            target=_run_campaign_local,
-            args=(job.job_id, campaign_id, max_rounds, trace_uuid),
-            daemon=True
-        )
-        thread.start()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop:
+            loop.create_task(
+                _run_campaign_async(job.job_id, campaign_id, max_rounds, trace_uuid)
+            )
+        else:
+            thread = threading.Thread(
+                target=_run_campaign_local,
+                args=(job.job_id, campaign_id, max_rounds, trace_uuid),
+                daemon=True
+            )
+            thread.start()
+
         return {
             "job_id": str(job.job_id),
             "status": job.status.value,
