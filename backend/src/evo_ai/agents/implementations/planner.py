@@ -221,7 +221,7 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
             )
 
         # Evaluation strategy (supports ensemble evaluators)
-        evaluators = config.get("evaluators", ["llm_judge"])
+        evaluators = config.get("evaluators") or ["llm_judge"]
         ensemble = config.get("ensemble")
         if ensemble is None and len(evaluators) > 1:
             weight = 1.0 / len(evaluators)
@@ -235,7 +235,7 @@ Output: A detailed round plan with mutation strategy, variant counts, and reason
             "parallel_execution": True,
             "timeout_seconds": 300,
         }
-        budget_config = config.get("evaluation_budget", {})
+        budget_config = config.get("evaluation_budget") or {}
         evaluation_strategy.update({
             "max_cost_usd": budget_config.get("max_cost_usd", config.get("max_cost_usd")),
             "max_latency_ms": budget_config.get("max_latency_ms", config.get("max_latency_ms")),
